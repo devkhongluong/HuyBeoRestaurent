@@ -1,0 +1,424 @@
+@model List<webHuyBeo.Models.MonAn>
+@{
+    Layout = null;
+    var danhMucs = ViewBag.DanhMucs as List<webHuyBeo.Models.DanhMuc>;
+    var token = ViewBag.Token as string;
+
+    // Group món ăn theo danh mục
+    var grouped = Model
+        .GroupBy(m => m.DanhMuc)
+        .OrderBy(g => g.Key?.ThuTu ?? 99)
+        .ToList();
+
+    // Serialize topping data cho JS
+    var menuData = Model.Select(m => new {
+        m.MonAnID, m.TenMon, m.MoTa, m.GiaBan, m.HinhAnh, m.ConBan,
+        DanhMucID = m.DanhMucID,
+        Toppings = m.MonAnToppings?.Select(t => new {
+            t.Topping.ToppingID, t.Topping.TenTopping, t.Topping.GiaThem
+        })
+    });
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Menu - Huy Béo</title>
+    <meta name="description" content="Xem menu và đặt món tại Huy Béo" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="~/css/order.css" />
+</head>
+<body>
+
+<!-- Header -->
+<header class="order-header">
+    <div class="header-logo">🍖</div>
+    <div class="header-brand">
+        <div class="header-name">Huy Béo</div>
+        <div class="header-token">Mã phiên: @token</div>
+    </div>
+    <a href="/Order/GioHang?token=@token" class="header-cart-btn" id="headerCartBtn">
+        <i class="fas fa-shopping-bag"></i>
+        <span class="cart-badge" id="headerBadge">0</span>
+    </a>
+</header>
+
+<!-- Category Tabs -->
+<div class="category-tabs" id="categoryTabs">
+    @foreach (var g in grouped)
+    {
+        <button class="cat-tab" onclick="scrollToSection('@g.Key?.DanhMucID')" data-id="@g.Key?.DanhMucID">
+            @g.Key?.TenDanhMuc
+        </button>
+    }
+</div>
+
+<!-- Menu Content -->
+<main class="order-content" id="orderContent">
+
+    <!-- Toast -->
+    <div class="add-toast" id="addToast">✓ Đã thêm vào giỏ!</div>
+
+    @foreach (var g in grouped)
+    {
+        <section class="menu-section" id="section-@g.Key?.DanhMucID">
+            <h2 class="section-title">@g.Key?.TenDanhMuc</h2>
+            <div class="food-grid">
+                @foreach (var mon in g)
+                {
+                    <div class="food-card @(!mon.ConBan ? "out-of-stock" : "")"
+                         onclick="openSheet(@mon.MonAnID)"
+                         id="card-@mon.MonAnID">
+                        <div class="food-card-img">
+                            @if (!string.IsNullOrEmpty(mon.HinhAnh))
+                            {
+                                <img src="@mon.HinhAnh" alt="@mon.TenMon" loading="lazy" />
+                            }
+                            else
+                            {
+                                <span>🍽️</span>
+                            }
+                        </div>
+                        <span class="food-qty-badge" id="badge-@mon.MonAnID">0</span>
+                        <div class="food-card-body">
+                            <div class="food-card-name">@mon.TenMon</div>
+                            @if (!string.IsNullOrEmpty(mon.MoTa))
+                            {
+                                <div class="food-card-desc">@mon.MoTa</div>
+                            }
+                            <div class="food-card-footer">
+                                <span class="food-price">@string.Format("{0:N0}đ", mon.GiaBan)</span>
+                                @if (mon.ConBan)
+                                {
+                                    <button class="add-btn" onclick="event.stopPropagation(); quickAdd(@mon.MonAnID)">+</button>
+                                }
+                                else
+                                {
+                                    <span style="font-size:11px;color:var(--danger);font-weight:600;">Hết hàng</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </section>
+    }
+</main>
+
+<!-- Bottom Sheet Overlay -->
+<div class="sheet-overlay" id="sheetOverlay" onclick="closeSheet()">
+    <div class="bottom-sheet" id="bottomSheet" onclick="event.stopPropagation()">
+        <div class="sheet-handle"></div>
+        <div id="sheetImgWrap"></div>
+        <div class="sheet-body">
+            <div class="sheet-name" id="sheetName"></div>
+            <div class="sheet-price" id="sheetPrice"></div>
+            <div class="sheet-desc" id="sheetDesc"></div>
+
+            <div id="toppingsSection" style="display:none;">
+                <div class="toppings-title">Chọn topping thêm</div>
+                <div class="topping-list" id="toppingList"></div>
+            </div>
+
+            <div class="qty-row">
+                <span class="qty-label">Số lượng</span>
+                <div class="qty-control">
+                    <button class="qty-btn" onclick="changeQty(-1)">−</button>
+                    <span class="qty-num" id="qtyNum">1</span>
+                    <button class="qty-btn" onclick="changeQty(1)">+</button>
+                </div>
+            </div>
+
+            <button class="sheet-add-btn" id="sheetAddBtn" onclick="addToCart()">
+                <span>Thêm vào giỏ</span>
+                <span id="sheetBtnPrice">0đ</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Floating Cart -->
+<div class="floating-cart" id="floatingCart">
+    <a href="/Order/GioHang?token=@token" class="floating-cart-btn" id="floatingCartBtn">
+        <div class="cart-btn-left">
+            <div class="cart-count-box"><span id="cartCount">0</span> món</div>
+            <span class="cart-btn-label">Xem giỏ hàng</span>
+        </div>
+        <span class="cart-btn-total" id="cartTotal">0đ</span>
+    </a>
+</div>
+
+<script>
+// ---- MENU DATA ----
+const menuData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(menuData));
+const TOKEN = '@token';
+const CART_KEY = 'cart_' + TOKEN;
+
+// ---- CART STATE ----
+let cart = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
+
+// ---- CURRENT SHEET STATE ----
+let currentMon = null;
+let currentQty = 1;
+
+// ---- INIT ----
+updateCartUI();
+initCategoryObserver();
+
+// ---- OPEN BOTTOM SHEET ----
+function openSheet(monAnID) {
+    const mon = menuData.find(m => m.monAnID === monAnID);
+    if (!mon) return;
+    currentMon = mon;
+    currentQty = 1;
+
+    // Image
+    const imgWrap = document.getElementById('sheetImgWrap');
+    if (mon.hinhAnh) {
+        imgWrap.innerHTML = `<img src="${mon.hinhAnh}" class="sheet-img" alt="${mon.tenMon}" />`;
+    } else {
+        imgWrap.innerHTML = `<div class="sheet-img-placeholder">🍽️</div>`;
+    }
+
+    document.getElementById('sheetName').textContent = mon.tenMon;
+    document.getElementById('sheetPrice').textContent = formatVND(mon.giaBan);
+    document.getElementById('sheetDesc').textContent = mon.moTa || '';
+
+    // Toppings
+    const toppingSection = document.getElementById('toppingsSection');
+    const toppingList = document.getElementById('toppingList');
+    if (mon.toppings && mon.toppings.length > 0) {
+        toppingList.innerHTML = mon.toppings.map(t => `
+            <label class="topping-item" id="tp-label-${t.toppingID}">
+                <input type="checkbox" id="tp-${t.toppingID}" value="${t.toppingID}"
+                       data-price="${t.giaThem}"
+                       onchange="updateSheetPrice(); toggleToppingStyle(${t.toppingID})" />
+                <span class="topping-item-name">${t.tenTopping}</span>
+                <span class="topping-item-price">+${formatVND(t.giaThem)}</span>
+            </label>
+        `).join('');
+        toppingSection.style.display = '';
+    } else {
+        toppingSection.style.display = 'none';
+    }
+
+    updateSheetPrice();
+    document.getElementById('qtyNum').textContent = 1;
+
+    // Open sheet
+    document.getElementById('sheetOverlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeSheet() {
+    document.getElementById('sheetOverlay').classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+function toggleToppingStyle(toppingID) {
+    const cb = document.getElementById('tp-' + toppingID);
+    const label = document.getElementById('tp-label-' + toppingID);
+    if (cb.checked) label.classList.add('selected');
+    else label.classList.remove('selected');
+}
+
+// ---- QTY CONTROL ----
+function changeQty(delta) {
+    currentQty = Math.max(1, currentQty + delta);
+    document.getElementById('qtyNum').textContent = currentQty;
+    updateSheetPrice();
+}
+
+// ---- PRICE CALCULATION ----
+function updateSheetPrice() {
+    if (!currentMon) return;
+    let toppingPrice = 0;
+    document.querySelectorAll('#toppingList input:checked').forEach(cb => {
+        toppingPrice += parseFloat(cb.dataset.price);
+    });
+    const total = (currentMon.giaBan + toppingPrice) * currentQty;
+    document.getElementById('sheetBtnPrice').textContent = formatVND(total);
+}
+
+// ---- ADD TO CART ----
+function addToCart() {
+    if (!currentMon) return;
+
+    const selectedToppings = [];
+    document.querySelectorAll('#toppingList input:checked').forEach(cb => {
+        const tid = parseInt(cb.value);
+        const tp = currentMon.toppings.find(t => t.toppingID === tid);
+        if (tp) selectedToppings.push(tp);
+    });
+
+    const toppingPrice = selectedToppings.reduce((s, t) => s + t.giaThem, 0);
+    const donGia = currentMon.giaBan + toppingPrice;
+
+    // Tìm item trùng (cùng món + topping)
+    const toppingKey = selectedToppings.map(t => t.toppingID).sort().join(',');
+    const existing = cart.find(c =>
+        c.monAnID === currentMon.monAnID &&
+        (c.toppingKey || '') === toppingKey
+    );
+
+    if (existing) {
+        existing.soLuong += currentQty;
+    } else {
+        cart.push({
+            monAnID: currentMon.monAnID,
+            tenMon: currentMon.tenMon,
+            hinhAnh: currentMon.hinhAnh,
+            donGia: donGia,
+            giaBan: currentMon.giaBan,
+            soLuong: currentQty,
+            toppings: selectedToppings,
+            toppingKey: toppingKey
+        });
+    }
+
+    saveCart();
+    closeSheet();
+    showToast(`Đã thêm ${currentMon.tenMon}!`);
+    updateCardBadge(currentMon.monAnID);
+    updateCartUI();
+}
+
+// ---- QUICK ADD (nút + trên card, không mở sheet nếu không có topping) ----
+function quickAdd(monAnID) {
+    const mon = menuData.find(m => m.monAnID === monAnID);
+    if (!mon) return;
+
+    if (mon.toppings && mon.toppings.length > 0) {
+        openSheet(monAnID);
+        return;
+    }
+
+    // Không topping → thêm thẳng
+    const existing = cart.find(c => c.monAnID === monAnID && !c.toppingKey);
+    if (existing) {
+        existing.soLuong++;
+    } else {
+        cart.push({
+            monAnID: mon.monAnID,
+            tenMon: mon.tenMon,
+            hinhAnh: mon.hinhAnh,
+            donGia: mon.giaBan,
+            giaBan: mon.giaBan,
+            soLuong: 1,
+            toppings: [],
+            toppingKey: ''
+        });
+    }
+
+    saveCart();
+    showToast(`Đã thêm ${mon.tenMon}!`);
+    updateCardBadge(monAnID);
+    updateCartUI();
+}
+
+// ---- UPDATE BADGE ON CARD ----
+function updateCardBadge(monAnID) {
+    const totalQty = cart.filter(c => c.monAnID === monAnID).reduce((s, c) => s + c.soLuong, 0);
+    const badge = document.getElementById('badge-' + monAnID);
+    if (badge) {
+        badge.textContent = totalQty;
+        if (totalQty > 0) badge.classList.add('show');
+        else badge.classList.remove('show');
+    }
+}
+
+// ---- UPDATE CART UI ----
+function updateCartUI() {
+    const totalQty = cart.reduce((s, c) => s + c.soLuong, 0);
+    const totalPrice = cart.reduce((s, c) => s + c.donGia * c.soLuong, 0);
+
+    // Header badge
+    const hBadge = document.getElementById('headerBadge');
+    if (hBadge) {
+        hBadge.textContent = totalQty;
+        hBadge.classList.toggle('show', totalQty > 0);
+    }
+
+    // Floating cart
+    const fc = document.getElementById('floatingCart');
+    const fcCount = document.getElementById('cartCount');
+    const fcTotal = document.getElementById('cartTotal');
+    if (fc) {
+        if (totalQty > 0) {
+            fc.classList.add('show');
+            fcCount.textContent = totalQty;
+            fcTotal.textContent = formatVND(totalPrice);
+        } else {
+            fc.classList.remove('show');
+        }
+    }
+
+    // Update all card badges
+    const uniqueMonIds = [...new Set(cart.map(c => c.monAnID))];
+    uniqueMonIds.forEach(id => updateCardBadge(id));
+
+    saveCart();
+}
+
+// ---- SAVE / LOAD ----
+function saveCart() { localStorage.setItem(CART_KEY, JSON.stringify(cart)); }
+
+// ---- TOAST ----
+function showToast(msg) {
+    const toast = document.getElementById('addToast');
+    toast.textContent = '✓ ' + msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+// ---- CATEGORY SCROLL ----
+function scrollToSection(id) {
+    const el = document.getElementById('section-' + id);
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+}
+
+function initCategoryObserver() {
+    const sections = document.querySelectorAll('.menu-section');
+    const tabs = document.querySelectorAll('.cat-tab');
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const id = entry.target.id.replace('section-', '');
+                tabs.forEach(tab => {
+                    tab.classList.toggle('active', tab.dataset.id == id);
+                });
+                // Scroll active tab into view
+                const activeTab = document.querySelector(`.cat-tab[data-id="${id}"]`);
+                if (activeTab) {
+                    activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                }
+            }
+        });
+    }, {
+        rootMargin: `-${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--header-h')) + parseInt(getComputedStyle(document.documentElement).getPropertyValue('--tab-h')) + 20}px 0px -60% 0px`
+    });
+
+    sections.forEach(s => observer.observe(s));
+}
+
+// ---- FORMAT ----
+function formatVND(n) { return new Intl.NumberFormat('vi-VN').format(Math.round(n)) + 'đ'; }
+
+// Activate first tab
+document.addEventListener('DOMContentLoaded', () => {
+    const firstTab = document.querySelector('.cat-tab');
+    if (firstTab) firstTab.classList.add('active');
+
+    // Restore badges from cart
+    const savedCart = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
+    cart = savedCart;
+    updateCartUI();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,167 @@
+@model webHuyBeo.Models.MonAn
+@{
+    ViewData["Title"] = "Chỉnh sửa Món ăn";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+    var toppings = ViewBag.Toppings as List<webHuyBeo.Models.Topping>;
+    var selectedToppings = ViewBag.SelectedToppings as List<int> ?? new List<int>();
+}
+
+<div style="max-width:860px;">
+    <div style="margin-bottom:16px;">
+        <a href="/Admin/MonAn" class="btn btn-outline btn-sm"><i class="fas fa-arrow-left"></i> Quay lại</a>
+    </div>
+
+    <form method="post" action="/Admin/SuaMonAn/@Model.MonAnID" enctype="multipart/form-data">
+        @Html.AntiForgeryToken()
+        <div style="display:grid;gap:20px;grid-template-columns:1fr 340px;">
+
+            <!-- Left Column -->
+            <div style="display:flex;flex-direction:column;gap:20px;">
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Thông tin cơ bản</span></div>
+                    <div class="card-body">
+                        <div class="form-grid" style="gap:16px;">
+                            <div class="form-group span-full">
+                                <label class="form-label">Tên món <span class="required">*</span></label>
+                                <input type="text" name="TenMon" class="form-control" value="@Model.TenMon" required />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Danh mục <span class="required">*</span></label>
+                                <select name="DanhMucID" class="form-select" required>
+                                    @foreach (var item in ViewBag.DanhMucs as Microsoft.AspNetCore.Mvc.Rendering.SelectList ?? new Microsoft.AspNetCore.Mvc.Rendering.SelectList(new List<string>()))
+                                    {
+                                        if (item.Selected)
+                                        {
+                                            <option value="@item.Value" selected>@item.Text</option>
+                                        }
+                                        else
+                                        {
+                                            <option value="@item.Value">@item.Text</option>
+                                        }
+                                    }
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Giá bán (đ) <span class="required">*</span></label>
+                                <input type="number" name="GiaBan" class="form-control" value="@Model.GiaBan" min="0" step="1000" required />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Giá vốn (đ)</label>
+                                <input type="number" name="GiaVon" class="form-control" value="@Model.GiaVon" min="0" step="1000" />
+                            </div>
+                            <div class="form-group span-full">
+                                <label class="form-label">Mô tả / Thành phần</label>
+                                <textarea name="MoTa" class="form-control">@Model.MoTa</textarea>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Trạng thái</label>
+                                <div class="toggle-wrap" style="margin-top:6px;">
+                                    <label class="toggle">
+                                        <input type="checkbox" name="ConBan" value="true" @(Model.ConBan ? "checked" : "") id="toggleConBan" />
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <span class="toggle-label" id="conBanLabel">@(Model.ConBan ? "Còn bán" : "Hết hàng")</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                @if (toppings != null && toppings.Any())
+                {
+                    <div class="card">
+                        <div class="card-header"><span class="card-title">Topping đi kèm</span></div>
+                        <div class="card-body">
+                            <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(160px, 1fr));gap:10px;">
+                                @foreach (var topping in toppings)
+                                {
+                                    bool isSelected = selectedToppings.Contains(topping.ToppingID);
+                                    <label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid @(isSelected ? "var(--primary)" : "var(--border)");border-radius:var(--radius-sm);cursor:pointer;transition:all 0.2s;background:@(isSelected ? "var(--primary-light)" : "");" class="topping-item">
+                                        <input type="checkbox" name="toppingIds" value="@topping.ToppingID" @(isSelected ? "checked" : "") style="accent-color:var(--primary);" />
+                                        <div>
+                                            <div style="font-size:13px;font-weight:600;">@topping.TenTopping</div>
+                                            <div style="font-size:11px;color:var(--primary);">+@string.Format("{0:N0}đ", topping.GiaThem)</div>
+                                        </div>
+                                    </label>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <!-- Right Column -->
+            <div style="display:flex;flex-direction:column;gap:20px;">
+                <div class="card">
+                    <div class="card-header"><span class="card-title">Hình ảnh món</span></div>
+                    <div class="card-body">
+                        <label class="img-preview-wrap" for="hinhAnhInput" id="previewWrap">
+                            @if (!string.IsNullOrEmpty(Model.HinhAnh))
+                            {
+                                <img src="@Model.HinhAnh" alt="@Model.TenMon" id="imgPreview" />
+                                <div class="img-placeholder" id="imgPlaceholder" style="display:none;">
+                                    <i class="fas fa-camera"></i>
+                                    <span>Nhấn để thay ảnh</span>
+                                </div>
+                            }
+                            else
+                            {
+                                <img src="" alt="" id="imgPreview" style="display:none;" />
+                                <div class="img-placeholder" id="imgPlaceholder">
+                                    <i class="fas fa-camera"></i>
+                                    <span>Nhấn để chọn ảnh</span>
+                                </div>
+                            }
+                        </label>
+                        <input type="file" name="hinhAnh" id="hinhAnhInput" accept="image/*" style="display:none;" />
+                        <div style="margin-top:10px;font-size:12px;color:var(--text-muted);">Để trống nếu không thay đổi ảnh</div>
+                    </div>
+                </div>
+
+                <div class="card" style="padding:20px;">
+                    <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">
+                        <i class="fas fa-save"></i> Lưu thay đổi
+                    </button>
+                    <a href="/Admin/MonAn" class="btn btn-outline" style="width:100%;justify-content:center;margin-top:10px;">
+                        Hủy bỏ
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+<script>
+    const input = document.getElementById('hinhAnhInput');
+    const preview = document.getElementById('imgPreview');
+    const placeholder = document.getElementById('imgPlaceholder');
+
+    input.addEventListener('change', function() {
+        const file = this.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+                placeholder.style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    const toggleConBan = document.getElementById('toggleConBan');
+    const conBanLabel = document.getElementById('conBanLabel');
+    toggleConBan.addEventListener('change', function() {
+        conBanLabel.textContent = this.checked ? 'Còn bán' : 'Hết hàng';
+    });
+
+    document.querySelectorAll('.topping-item input').forEach(cb => {
+        cb.addEventListener('change', function() {
+            this.closest('label').style.borderColor = this.checked ? 'var(--primary)' : 'var(--border)';
+            this.closest('label').style.background = this.checked ? 'var(--primary-light)' : '';
+        });
+    });
+</script>
+}

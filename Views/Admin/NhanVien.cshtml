@@ -1,0 +1,218 @@
+@model List<webHuyBeo.Models.NguoiDung>
+@{
+    ViewData["Title"] = "Quản lý Nhân viên";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+
+    var vaiTroColors = new Dictionary<string, string> {
+        { "Admin", "badge-danger" },
+        { "QuanLy", "badge-warning" },
+        { "ThuNgan", "badge-info" },
+        { "Bep", "badge-success" }
+    };
+    var vaiTroLabel = new Dictionary<string, string> {
+        { "Admin", "Admin" },
+        { "QuanLy", "Quản lý" },
+        { "ThuNgan", "Thu ngân" },
+        { "Bep", "Bếp" }
+    };
+}
+
+<div style="display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start;">
+
+    <!-- Table -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Danh sách Nhân viên (@Model.Count)</span>
+        </div>
+        <div class="table-container">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Họ tên</th>
+                        <th>Tên đăng nhập</th>
+                        <th>Vai trò</th>
+                        <th>Trạng thái</th>
+                        <th style="text-align:right">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="5">
+                                <div class="empty-state">
+                                    <i class="fas fa-users"></i>
+                                    <p>Chưa có nhân viên nào. Thêm ở bên phải!</p>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    @foreach (var nv in Model)
+                    {
+                        string badgeClass = vaiTroColors.ContainsKey(nv.VaiTro) ? vaiTroColors[nv.VaiTro] : "badge-info";
+                        string tenVaiTro = vaiTroLabel.ContainsKey(nv.VaiTro) ? vaiTroLabel[nv.VaiTro] : nv.VaiTro;
+                        bool isActive = nv.TrangThai == "DangLamViec";
+                        <tr style="opacity: @(isActive ? "1" : "0.55")">
+                            <td>
+                                <div style="display:flex;align-items:center;gap:10px;">
+                                    <div style="width:36px;height:36px;border-radius:50%;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0;">
+                                        @nv.Hoten.FirstOrDefault()
+                                    </div>
+                                    <span style="font-weight:600">@nv.Hoten</span>
+                                </div>
+                            </td>
+                            <td style="font-family:monospace;color:var(--text-muted)">@nv.TenDangNhap</td>
+                            <td><span class="badge @badgeClass">@tenVaiTro</span></td>
+                            <td>
+                                @if (isActive)
+                                {
+                                    <span class="badge badge-success"><i class="fas fa-circle" style="font-size:7px;"></i> Đang làm việc</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-danger"><i class="fas fa-circle" style="font-size:7px;"></i> Đã nghỉ</span>
+                                }
+                            </td>
+                            <td style="text-align:right">
+                                <div style="display:flex;gap:6px;justify-content:flex-end;">
+                                    <button class="btn btn-outline btn-sm btn-icon" title="Chỉnh sửa"
+                                            onclick="openSuaNV(@nv.NguoiDungID, '@nv.Hoten.Replace("'","\\'")', '@nv.TenDangNhap', '@nv.VaiTro', '@nv.TrangThai')">
+                                        <i class="fas fa-pen"></i>
+                                    </button>
+                                    @if (isActive)
+                                    {
+                                        <form method="post" action="/Admin/XoaNhanVien/@nv.NguoiDungID" style="margin:0" onsubmit="return confirm('Vô hiệu hóa tài khoản @nv.Hoten.Replace("'","\\'")?')">
+                                            @Html.AntiForgeryToken()
+                                            <button type="submit" class="btn btn-danger btn-sm btn-icon" title="Vô hiệu hóa">
+                                                <i class="fas fa-user-slash"></i>
+                                            </button>
+                                        </form>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Add Form -->
+    <div style="position:sticky;top:84px;display:flex;flex-direction:column;gap:16px;">
+        <div class="card">
+            <div class="card-header"><span class="card-title"><i class="fas fa-user-plus" style="color:var(--primary)"></i> Thêm Nhân viên mới</span></div>
+            <div class="card-body">
+                <form method="post" action="/Admin/TaoNhanVien">
+                    @Html.AntiForgeryToken()
+                    <div style="display:flex;flex-direction:column;gap:14px;">
+                        <div class="form-group">
+                            <label class="form-label">Họ và tên <span class="required">*</span></label>
+                            <input type="text" name="Hoten" class="form-control" placeholder="VD: Nguyễn Văn A" required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Tên đăng nhập <span class="required">*</span></label>
+                            <input type="text" name="TenDangNhap" class="form-control" placeholder="VD: nhanvien01" required autocomplete="off" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Mật khẩu <span class="required">*</span></label>
+                            <input type="password" name="MatKhau" class="form-control" placeholder="Ít nhất 6 ký tự" required minlength="6" autocomplete="new-password" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Vai trò <span class="required">*</span></label>
+                            <select name="VaiTro" class="form-select" required>
+                                <option value="ThuNgan">Thu ngân</option>
+                                <option value="Bep">Bếp</option>
+                                <option value="QuanLy">Quản lý</option>
+                                <option value="Admin">Admin</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">
+                            <i class="fas fa-user-plus"></i> Thêm Nhân viên
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="card" style="padding:16px;">
+            <div style="font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:10px;">Phân quyền vai trò</div>
+            <div style="display:flex;flex-direction:column;gap:8px;font-size:12px;">
+                <div style="display:flex;align-items:center;gap:8px;"><span class="badge badge-danger">Admin</span> Toàn quyền hệ thống</div>
+                <div style="display:flex;align-items:center;gap:8px;"><span class="badge badge-warning">Quản lý</span> Xem báo cáo, quản lý thực đơn</div>
+                <div style="display:flex;align-items:center;gap:8px;"><span class="badge badge-info">Thu ngân</span> Nhận & xử lý đơn, thanh toán</div>
+                <div style="display:flex;align-items:center;gap:8px;"><span class="badge badge-success">Bếp</span> Cập nhật trạng thái chế biến</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="suaNVModal">
+    <div class="modal" style="max-width:460px">
+        <div class="modal-header">
+            <span class="modal-title">Chỉnh sửa Nhân viên</span>
+            <button class="modal-close" onclick="closeModal('suaNVModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <form method="post" action="/Admin/SuaNhanVien">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <input type="hidden" name="NguoiDungID" id="editNVID" />
+                <div style="display:flex;flex-direction:column;gap:14px;">
+                    <div class="form-group">
+                        <label class="form-label">Tên đăng nhập</label>
+                        <input type="text" id="editTenDangNhap" class="form-control" readonly style="background:var(--bg);color:var(--text-muted);" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Họ và tên <span class="required">*</span></label>
+                        <input type="text" name="Hoten" id="editHoten" class="form-control" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Vai trò <span class="required">*</span></label>
+                        <select name="VaiTro" id="editVaiTro" class="form-select" required>
+                            <option value="ThuNgan">Thu ngân</option>
+                            <option value="Bep">Bếp</option>
+                            <option value="QuanLy">Quản lý</option>
+                            <option value="Admin">Admin</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Trạng thái</label>
+                        <select name="TrangThai" id="editTrangThaiNV" class="form-select">
+                            <option value="DangLamViec">Đang làm việc</option>
+                            <option value="DaNghi">Đã nghỉ</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Mật khẩu mới</label>
+                        <input type="password" name="MatKhauMoi" id="editMatKhauMoi" class="form-control"
+                               placeholder="Để trống nếu không thay đổi" autocomplete="new-password" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('suaNVModal')">Hủy</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Lưu thay đổi</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function openSuaNV(id, hoten, tenDangNhap, vaiTro, trangThai) {
+        document.getElementById('editNVID').value = id;
+        document.getElementById('editHoten').value = hoten;
+        document.getElementById('editTenDangNhap').value = tenDangNhap;
+        document.getElementById('editVaiTro').value = vaiTro;
+        document.getElementById('editTrangThaiNV').value = trangThai;
+        document.getElementById('editMatKhauMoi').value = '';
+        document.getElementById('suaNVModal').classList.add('open');
+    }
+
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+    document.querySelectorAll('.modal-overlay').forEach(o => {
+        o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
+    });
+</script>
+}

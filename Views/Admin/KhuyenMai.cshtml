@@ -1,0 +1,313 @@
+@model List<webHuyBeo.Models.KhuyenMai>
+@{
+    ViewData["Title"] = "Quản lý Khuyến mãi";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+}
+
+<div style="display:grid;grid-template-columns:1fr 400px;gap:20px;align-items:start;">
+
+    <!-- Table -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Danh sách Khuyến mãi (@Model.Count)</span>
+        </div>
+        <div class="table-container">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Mã</th>
+                        <th>Tên chương trình</th>
+                        <th>Loại giảm</th>
+                        <th>Giá trị</th>
+                        <th>Hiệu lực</th>
+                        <th>Đã dùng</th>
+                        <th>Trạng thái</th>
+                        <th style="text-align:right">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="8">
+                                <div class="empty-state">
+                                    <i class="fas fa-percent"></i>
+                                    <p>Chưa có chương trình khuyến mãi nào.</p>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    @foreach (var km in Model)
+                    {
+                        bool expired = km.NgayKetThuc < DateTime.Now;
+                        bool active = km.TrangThai == "HoatDong" && !expired;
+                        <tr>
+                            <td>
+                                <span style="font-family:monospace;font-weight:700;font-size:13px;background:var(--primary-light);color:var(--primary);padding:3px 8px;border-radius:6px;">@km.MaCode</span>
+                            </td>
+                            <td style="font-size:13px;">@(km.TenKM ?? "-")</td>
+                            <td>
+                                @if (km.LoaiGiam == "PhanTram")
+                                {
+                                    <span class="badge badge-info">% Phần trăm</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-warning">₫ Tiền mặt</span>
+                                }
+                            </td>
+                            <td style="font-weight:700;color:var(--primary);">
+                                @(km.LoaiGiam == "PhanTram" ? $"{km.GiaTri}%" : $"{string.Format("{0:N0}", km.GiaTri)}đ")
+                            </td>
+                            <td style="font-size:12px;">
+                                <div>@km.NgayBatDau.ToString("dd/MM/yy")</div>
+                                <div style="color:@(expired ? "var(--danger)" : "var(--text-muted)")">→ @km.NgayKetThuc.ToString("dd/MM/yy")</div>
+                            </td>
+                            <td>
+                                <span style="font-weight:600">@km.SoLuongDaDung</span>
+                                @if (km.SoLuongToiDa.HasValue)
+                                {
+                                    <span style="color:var(--text-muted)"> / @km.SoLuongToiDa</span>
+                                }
+                            </td>
+                            <td>
+                                @if (expired)
+                                {
+                                    <span class="badge badge-danger">Hết hạn</span>
+                                }
+                                else
+                                {
+                                    <label class="toggle" title="@(active ? "Đang hoạt động" : "Tạm dừng")">
+                                        <input type="checkbox" @(active ? "checked" : "")
+                                               onchange="toggleKM(@km.KhuyenMaiID, this)" />
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                }
+                            </td>
+                            <td style="text-align:right">
+                                <div style="display:flex;gap:6px;justify-content:flex-end;">
+                                    <button class="btn btn-outline btn-sm btn-icon" title="Chỉnh sửa"
+                                            onclick="openSuaKM(@km.KhuyenMaiID)">
+                                        <i class="fas fa-pen"></i>
+                                    </button>
+                                    <button class="btn btn-danger btn-sm btn-icon" title="Xóa"
+                                            onclick="confirmXoaKM(@km.KhuyenMaiID, '@km.MaCode')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Add Form -->
+    <div style="position:sticky;top:84px;">
+        <div class="card">
+            <div class="card-header"><span class="card-title"><i class="fas fa-percent" style="color:var(--primary)"></i> Tạo Khuyến mãi mới</span></div>
+            <div class="card-body">
+                <form method="post" action="/Admin/TaoKhuyenMai">
+                    @Html.AntiForgeryToken()
+                    <div style="display:flex;flex-direction:column;gap:14px;">
+                        <div class="form-group">
+                            <label class="form-label">Mã code <span class="required">*</span></label>
+                            <input type="text" name="MaCode" class="form-control" placeholder="VD: GIAM20" required style="text-transform:uppercase" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Tên chương trình</label>
+                            <input type="text" name="TenKM" class="form-control" placeholder="VD: Giảm 20% cuối tuần" />
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                            <div class="form-group">
+                                <label class="form-label">Loại giảm <span class="required">*</span></label>
+                                <select name="LoaiGiam" class="form-select" id="loaiGiamSelect" onchange="toggleGiamFields(this.value)">
+                                    <option value="PhanTram">% Phần trăm</option>
+                                    <option value="TienMat">₫ Tiền mặt</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Giá trị <span class="required">*</span></label>
+                                <input type="number" name="GiaTri" class="form-control" min="0" step="1" placeholder="20" required />
+                            </div>
+                        </div>
+                        <div class="form-group" id="giamToiDaGroup">
+                            <label class="form-label">Giảm tối đa (đ)</label>
+                            <input type="number" name="GiamToiDa" class="form-control" min="0" step="1000" placeholder="Không giới hạn" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Đơn tối thiểu (đ)</label>
+                            <input type="number" name="DonToiThieu" class="form-control" min="0" step="1000" placeholder="Không giới hạn" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Số lượt tối đa</label>
+                            <input type="number" name="SoLuongToiDa" class="form-control" min="1" placeholder="Không giới hạn" />
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                            <div class="form-group">
+                                <label class="form-label">Từ ngày <span class="required">*</span></label>
+                                <input type="date" name="NgayBatDau" class="form-control" required />
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Đến ngày <span class="required">*</span></label>
+                                <input type="date" name="NgayKetThuc" class="form-control" required />
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Trạng thái</label>
+                            <select name="TrangThai" class="form-select">
+                                <option value="HoatDong">Hoạt động</option>
+                                <option value="TamDung">Tạm dừng</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">
+                            <i class="fas fa-plus"></i> Tạo Khuyến mãi
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="suaKMModal">
+    <div class="modal" style="max-width:520px">
+        <div class="modal-header">
+            <span class="modal-title">Chỉnh sửa Khuyến mãi</span>
+            <button class="modal-close" onclick="closeModal('suaKMModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <form method="post" action="/Admin/SuaKhuyenMai">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <input type="hidden" name="KhuyenMaiID" id="editKMID" />
+                <input type="hidden" name="SoLuongDaDung" id="editSoLuongDaDung" />
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                    <div class="form-group">
+                        <label class="form-label">Mã code <span class="required">*</span></label>
+                        <input type="text" name="MaCode" id="editMaCode" class="form-control" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Tên chương trình</label>
+                        <input type="text" name="TenKM" id="editTenKM" class="form-control" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Loại giảm <span class="required">*</span></label>
+                        <select name="LoaiGiam" id="editLoaiGiam" class="form-select">
+                            <option value="PhanTram">% Phần trăm</option>
+                            <option value="TienMat">₫ Tiền mặt</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Giá trị <span class="required">*</span></label>
+                        <input type="number" name="GiaTri" id="editGiaTri" class="form-control" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Giảm tối đa (đ)</label>
+                        <input type="number" name="GiamToiDa" id="editGiamToiDa" class="form-control" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Đơn tối thiểu (đ)</label>
+                        <input type="number" name="DonToiThieu" id="editDonToiThieu" class="form-control" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Số lượt tối đa</label>
+                        <input type="number" name="SoLuongToiDa" id="editSoLuongToiDa" class="form-control" />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Trạng thái</label>
+                        <select name="TrangThai" id="editTrangThaiKM" class="form-select">
+                            <option value="HoatDong">Hoạt động</option>
+                            <option value="TamDung">Tạm dừng</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Từ ngày <span class="required">*</span></label>
+                        <input type="date" name="NgayBatDau" id="editNgayBatDau" class="form-control" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Đến ngày <span class="required">*</span></label>
+                        <input type="date" name="NgayKetThuc" id="editNgayKetThuc" class="form-control" required />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('suaKMModal')">Hủy</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Lưu thay đổi</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal-overlay" id="xoaKMModal">
+    <div class="modal" style="max-width:400px">
+        <div class="modal-header">
+            <span class="modal-title" style="color:var(--danger)"><i class="fas fa-triangle-exclamation"></i> Xác nhận xóa</span>
+            <button class="modal-close" onclick="closeModal('xoaKMModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <p>Bạn có chắc muốn xóa mã khuyến mãi <strong id="xoaMaKM"></strong>?</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('xoaKMModal')">Hủy</button>
+            <form method="post" id="xoaKMForm" style="margin:0">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-danger"><i class="fas fa-trash"></i> Xóa</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    // Embed KM data for edit modal
+    var kmData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Select(k => new {
+        k.KhuyenMaiID, k.MaCode, k.TenKM, k.LoaiGiam, k.GiaTri, k.GiamToiDa, k.DonToiThieu,
+        k.SoLuongToiDa, k.SoLuongDaDung, k.TrangThai,
+        NgayBatDau = k.NgayBatDau.ToString("yyyy-MM-dd"),
+        NgayKetThuc = k.NgayKetThuc.ToString("yyyy-MM-dd")
+    })));
+
+    function openSuaKM(id) {
+        var km = kmData.find(k => k.khuyenMaiID === id);
+        if (!km) return;
+        document.getElementById('editKMID').value = km.khuyenMaiID;
+        document.getElementById('editMaCode').value = km.maCode;
+        document.getElementById('editTenKM').value = km.tenKM || '';
+        document.getElementById('editLoaiGiam').value = km.loaiGiam;
+        document.getElementById('editGiaTri').value = km.giaTri;
+        document.getElementById('editGiamToiDa').value = km.giamToiDa || '';
+        document.getElementById('editDonToiThieu').value = km.donToiThieu || '';
+        document.getElementById('editSoLuongToiDa').value = km.soLuongToiDa || '';
+        document.getElementById('editSoLuongDaDung').value = km.soLuongDaDung;
+        document.getElementById('editTrangThaiKM').value = km.trangThai;
+        document.getElementById('editNgayBatDau').value = km.ngayBatDau;
+        document.getElementById('editNgayKetThuc').value = km.ngayKetThuc;
+        document.getElementById('suaKMModal').classList.add('open');
+    }
+
+    function confirmXoaKM(id, maCode) {
+        document.getElementById('xoaMaKM').textContent = maCode;
+        document.getElementById('xoaKMForm').action = '/Admin/XoaKhuyenMai/' + id;
+        document.getElementById('xoaKMModal').classList.add('open');
+    }
+
+    function toggleKM(id, checkbox) {
+        fetch('/Admin/ToggleKhuyenMai/' + id, { method: 'POST' })
+            .then(r => r.json())
+            .then(data => { if (!data.success) checkbox.checked = !checkbox.checked; });
+    }
+
+    function toggleGiamFields(val) {
+        document.getElementById('giamToiDaGroup').style.display = val === 'PhanTram' ? '' : 'none';
+    }
+    toggleGiamFields(document.getElementById('loaiGiamSelect').value);
+
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+    document.querySelectorAll('.modal-overlay').forEach(o => {
+        o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
+    });
+</script>
+}

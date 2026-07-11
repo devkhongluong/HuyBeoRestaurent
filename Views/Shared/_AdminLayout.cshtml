@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Huy Béo Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <span class="logo-icon">🍖</span>
+                <div class="logo-text">
+                    <span class="logo-name">Huy Béo</span>
+                    <span class="logo-sub">Quản trị hệ thống</span>
+                </div>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <div class="nav-section-label">Tổng quan</div>
+            <a href="/Admin" class="nav-item @(ViewData["ActiveMenu"]?.ToString() == "dashboard" ? "active" : "")">
+                <i class="fas fa-chart-pie nav-icon"></i>
+                <span>Dashboard</span>
+            </a>
+
+            <div class="nav-section-label">Thực đơn</div>
+            <a href="/Admin/MonAn" class="nav-item @(ViewData["ActiveMenu"]?.ToString() == "monan" ? "active" : "")">
+                <i class="fas fa-bowl-food nav-icon"></i>
+                <span>Quản lý Món ăn</span>
+            </a>
+            <a href="/Admin/DanhMuc" class="nav-item @(ViewData["ActiveMenu"]?.ToString() == "danhmuc" ? "active" : "")">
+                <i class="fas fa-tags nav-icon"></i>
+                <span>Danh mục</span>
+            </a>
+            <a href="/Admin/Topping" class="nav-item @(ViewData["ActiveMenu"]?.ToString() == "topping" ? "active" : "")">
+                <i class="fas fa-plus-circle nav-icon"></i>
+                <span>Topping</span>
+            </a>
+
+            <div class="nav-section-label">Vận hành</div>
+            <a href="/Admin/DonHang" class="nav-item @(ViewData["ActiveMenu"]?.ToString() == "donhang" ? "active" : "")">
+                <i class="fas fa-receipt nav-icon"></i>
+                <span>Đơn hàng</span>
+            </a>
+            <a href="/Admin/KhuyenMai" class="nav-item @(ViewData["ActiveMenu"]?.ToString() == "khuyenmai" ? "active" : "")">
+                <i class="fas fa-percent nav-icon"></i>
+                <span>Khuyến mãi</span>
+            </a>
+
+            <div class="nav-section-label">Hệ thống</div>
+            <a href="/Admin/NhanVien" class="nav-item @(ViewData["ActiveMenu"]?.ToString() == "nhanvien" ? "active" : "")">
+                <i class="fas fa-users nav-icon"></i>
+                <span>Nhân viên</span>
+            </a>
+            <a href="/Admin/QrCode" class="nav-item @(ViewData["ActiveMenu"]?.ToString() == "qr" ? "active" : "")">
+                <i class="fas fa-qrcode nav-icon"></i>
+                <span>Mã QR</span>
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="user-info">
+                <div class="user-avatar">Q</div>
+                <div class="user-details">
+                    <span class="user-name">Quản lý</span>
+                    <span class="user-role">Admin</span>
+                </div>
+                <a href="/Auth/Logout" class="logout-btn" title="Đăng xuất">
+                    <i class="fas fa-sign-out-alt"></i>
+                </a>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main-wrapper">
+        <!-- Top Bar -->
+        <header class="topbar">
+            <button class="menu-toggle" id="menuToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="topbar-title">@ViewData["Title"]</div>
+            <div class="topbar-actions">
+                <div class="topbar-time" id="topbarTime"></div>
+                <a href="/" target="_blank" class="topbar-btn" title="Xem trang khách hàng">
+                    <i class="fas fa-external-link-alt"></i>
+                </a>
+            </div>
+        </header>
+
+        <!-- Page Content -->
+        <main class="page-content">
+            @if (TempData["Success"] != null)
+            {
+                <div class="alert-toast alert-success" id="alertToast">
+                    <i class="fas fa-check-circle"></i>
+                    @TempData["Success"]
+                </div>
+            }
+            @if (TempData["Error"] != null)
+            {
+                <div class="alert-toast alert-error" id="alertToast">
+                    <i class="fas fa-exclamation-circle"></i>
+                    @TempData["Error"]
+                </div>
+            }
+            @RenderBody()
+        </main>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script>
+        // Toggle sidebar on mobile
+        document.getElementById('menuToggle').addEventListener('click', function () {
+            document.getElementById('sidebar').classList.toggle('open');
+        });
+
+        // Real-time clock
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('topbarTime').textContent =
+                now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Auto dismiss toast
+        const toast = document.getElementById('alertToast');
+        if (toast) {
+            setTimeout(() => toast.classList.add('hide'), 4000);
+        }
+    </script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

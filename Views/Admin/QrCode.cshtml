@@ -1,0 +1,159 @@
+@{
+    ViewData["Title"] = "Mã QR Quét Đặt món";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+    var orderUrl = ViewBag.OrderUrl as string;
+}
+
+<div style="max-width:720px;margin:0 auto;">
+    <div style="display:grid;gap:20px;">
+
+        <!-- QR Card -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title"><i class="fas fa-qrcode" style="color:var(--primary)"></i> Mã QR Quét Đặt món</span>
+            </div>
+            <div class="card-body">
+                <div style="display:grid;grid-template-columns:auto 1fr;gap:32px;align-items:center;">
+                    <!-- QR Code Display -->
+                    <div style="text-align:center;">
+                        <div id="qrcode" style="display:inline-block;padding:16px;background:#fff;border-radius:var(--radius);border:2px solid var(--border);box-shadow:var(--shadow-md);"></div>
+                        <div style="margin-top:12px;font-size:12px;color:var(--text-muted);">Quét để đặt món</div>
+                    </div>
+
+                    <!-- Info -->
+                    <div style="display:flex;flex-direction:column;gap:16px;">
+                        <div>
+                            <div style="font-size:12px;color:var(--text-muted);font-weight:600;margin-bottom:4px;">ĐƯỜNG LINK ĐẶT MÓN</div>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <input type="text" id="orderUrlInput" class="form-control" value="@orderUrl" readonly style="font-family:monospace;font-size:12px;" />
+                                <button class="btn btn-outline btn-sm" onclick="copyUrl()" id="copyBtn" style="white-space:nowrap;">
+                                    <i class="fas fa-copy"></i> Sao chép
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style="display:flex;flex-direction:column;gap:10px;">
+                            <div style="font-size:12px;color:var(--text-muted);font-weight:600;">TÙNG CHỈNH KÍCH THƯỚC</div>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                                <button class="btn btn-outline btn-sm" onclick="setSize(128)">Nhỏ (128px)</button>
+                                <button class="btn btn-outline btn-sm active" id="sizeBtn200" onclick="setSize(200)">Vừa (200px)</button>
+                                <button class="btn btn-outline btn-sm" onclick="setSize(300)">Lớn (300px)</button>
+                            </div>
+                        </div>
+
+                        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                            <button class="btn btn-primary" onclick="downloadQR()">
+                                <i class="fas fa-download"></i> Tải ảnh QR
+                            </button>
+                            <button class="btn btn-outline" onclick="window.print()">
+                                <i class="fas fa-print"></i> In QR
+                            </button>
+                            <a href="@orderUrl" target="_blank" class="btn btn-outline">
+                                <i class="fas fa-external-link-alt"></i> Mở trang đặt món
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions Card -->
+        <div class="card">
+            <div class="card-header"><span class="card-title">Hướng dẫn sử dụng QR</span></div>
+            <div class="card-body">
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:20px;">
+                    <div style="text-align:center;padding:16px;">
+                        <div style="font-size:32px;margin-bottom:12px;">🖨️</div>
+                        <div style="font-weight:600;margin-bottom:6px;">Bước 1: In QR</div>
+                        <div style="font-size:13px;color:var(--text-muted);">Tải ảnh QR về và in ra giấy. Có thể ép plastic để bền hơn.</div>
+                    </div>
+                    <div style="text-align:center;padding:16px;">
+                        <div style="font-size:32px;margin-bottom:12px;">📍</div>
+                        <div style="font-weight:600;margin-bottom:6px;">Bước 2: Dán tại quầy</div>
+                        <div style="font-size:13px;color:var(--text-muted);">Dán QR ở vị trí dễ nhìn, thuận tiện cho khách quét.</div>
+                    </div>
+                    <div style="text-align:center;padding:16px;">
+                        <div style="font-size:32px;margin-bottom:12px;">📱</div>
+                        <div style="font-weight:600;margin-bottom:6px;">Bước 3: Khách quét</div>
+                        <div style="font-size:13px;color:var(--text-muted);">Khách dùng camera điện thoại quét QR → mở trang đặt món.</div>
+                    </div>
+                    <div style="text-align:center;padding:16px;">
+                        <div style="font-size:32px;margin-bottom:12px;">✅</div>
+                        <div style="font-weight:600;margin-bottom:6px;">Bước 4: Xử lý đơn</div>
+                        <div style="font-size:13px;color:var(--text-muted);">Đơn hàng tự động hiển thị trên màn hình POS của thu ngân.</div>
+                    </div>
+                </div>
+
+                <div style="margin-top:20px;padding:14px;background:var(--primary-light);border-radius:var(--radius);border-left:4px solid var(--primary);">
+                    <div style="font-weight:600;color:var(--primary);margin-bottom:6px;font-size:13px;"><i class="fas fa-wifi"></i> Lưu ý về mạng</div>
+                    <div style="font-size:13px;color:var(--text);">
+                        Điện thoại của khách và máy tính chạy hệ thống phải <strong>kết nối cùng một mạng Wi-Fi</strong> (hoặc hotspot).
+                        Đường link hiện tại dùng IP nội bộ: <code style="background:#fff;padding:2px 6px;border-radius:4px;">@orderUrl</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Print styles -->
+<style>
+    @@media print {
+        .sidebar, .topbar, .card:not(:first-child) { display: none !important; }
+        .main-wrapper { margin-left: 0 !important; }
+        .page-content { padding: 0 !important; }
+        #qrcode { transform: scale(1.5); transform-origin: top left; }
+    }
+</style>
+
+@section Scripts {
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+    var currentSize = 200;
+    var qr = null;
+    var orderUrl = '@Html.Raw(orderUrl)';
+
+    function generateQR(size) {
+        document.getElementById('qrcode').innerHTML = '';
+        qr = new QRCode(document.getElementById('qrcode'), {
+            text: orderUrl,
+            width: size,
+            height: size,
+            colorDark: '#1a1a2e',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.H
+        });
+    }
+
+    function setSize(size) {
+        currentSize = size;
+        generateQR(size);
+    }
+
+    function downloadQR() {
+        setTimeout(() => {
+            var canvas = document.querySelector('#qrcode canvas');
+            if (canvas) {
+                var link = document.createElement('a');
+                link.download = 'huybeo-qr.png';
+                link.href = canvas.toDataURL();
+                link.click();
+            }
+        }, 300);
+    }
+
+    function copyUrl() {
+        navigator.clipboard.writeText(orderUrl).then(() => {
+            var btn = document.getElementById('copyBtn');
+            btn.innerHTML = '<i class="fas fa-check"></i> Đã sao chép!';
+            btn.style.color = 'var(--success)';
+            setTimeout(() => {
+                btn.innerHTML = '<i class="fas fa-copy"></i> Sao chép';
+                btn.style.color = '';
+            }, 2000);
+        });
+    }
+
+    generateQR(currentSize);
+</script>
+}

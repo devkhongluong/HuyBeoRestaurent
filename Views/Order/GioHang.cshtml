@@ -1,0 +1,270 @@
+@{
+    Layout = null;
+    var token = ViewBag.Token as string;
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Giỏ hàng - Huy Béo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="~/css/order.css" />
+</head>
+<body style="padding-bottom:0;">
+
+<!-- Cart Header -->
+<div class="cart-header">
+    <a href="/Order/Menu?token=@token" class="cart-back-btn">
+        <i class="fas fa-arrow-left"></i>
+    </a>
+    <span class="cart-title">Giỏ hàng của bạn</span>
+    <button onclick="clearCart()" style="background:none;border:none;color:var(--danger);font-size:13px;font-weight:600;cursor:pointer;padding:4px 8px;">
+        Xóa tất cả
+    </button>
+</div>
+
+<!-- Empty State -->
+<div class="empty-cart" id="emptyCart" style="display:none;">
+    <div class="empty-cart-icon">🛒</div>
+    <p>Giỏ hàng trống rỗng!</p>
+    <a href="/Order/Menu?token=@token" style="color:var(--primary);font-weight:600;text-decoration:none;">← Quay lại menu</a>
+</div>
+
+<!-- Cart Items -->
+<div class="cart-items" id="cartItemsContainer"></div>
+
+<!-- Promo Code -->
+<div class="promo-row">
+    <input type="text" class="promo-input" id="promoInput" placeholder="Nhập mã khuyến mãi..." />
+    <button class="promo-btn" onclick="applyPromo()">Áp dụng</button>
+</div>
+<div id="promoMsg" style="padding:0 16px 12px;font-size:13px;"></div>
+
+<!-- Ghi chú -->
+<div class="order-note">
+    <label class="note-label">Ghi chú cho bếp</label>
+    <textarea class="note-input" id="ghiChu" rows="2" placeholder="VD: Ít cay, không hành, thêm đá..."></textarea>
+</div>
+
+<!-- Order Summary -->
+<div class="order-summary" id="orderSummary" style="display:none;">
+    <div class="summary-row">
+        <span style="color:var(--text-muted)">Tạm tính</span>
+        <span id="sumTamTinh">0đ</span>
+    </div>
+    <div class="summary-row" id="sumDiscountRow" style="display:none;">
+        <span style="color:var(--success)"><i class="fas fa-tag"></i> Giảm giá</span>
+        <span style="color:var(--success)" id="sumDiscount">-0đ</span>
+    </div>
+    <div class="summary-row total">
+        <span>Tổng cộng</span>
+        <span id="sumTotal">0đ</span>
+    </div>
+</div>
+
+<!-- Checkout Button -->
+<div style="padding:0 16px 32px;">
+    <button class="checkout-btn" id="checkoutBtn" onclick="datHang()" disabled>
+        <i class="fas fa-check-circle"></i> Đặt hàng
+    </button>
+</div>
+
+<script>
+const TOKEN = '@token';
+const CART_KEY = 'cart_' + TOKEN;
+let cart = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
+let promoData = null;
+
+function formatVND(n) { return new Intl.NumberFormat('vi-VN').format(Math.round(n)) + 'đ'; }
+
+// ---- RENDER CART ----
+function renderCart() {
+    const container = document.getElementById('cartItemsContainer');
+    const emptyState = document.getElementById('emptyCart');
+    const summary = document.getElementById('orderSummary');
+    const btn = document.getElementById('checkoutBtn');
+
+    if (cart.length === 0) {
+        emptyState.style.display = 'flex';
+        container.style.display = 'none';
+        summary.style.display = 'none';
+        document.querySelector('.promo-row').style.display = 'none';
+        document.querySelector('.order-note').style.display = 'none';
+        btn.disabled = true;
+        return;
+    }
+
+    emptyState.style.display = 'none';
+    container.style.display = '';
+    summary.style.display = '';
+    document.querySelector('.promo-row').style.display = 'flex';
+    document.querySelector('.order-note').style.display = '';
+    btn.disabled = false;
+
+    container.innerHTML = cart.map((item, idx) => `
+        <div class="cart-item" id="cartItem-${idx}">
+            <div class="cart-item-img">
+                ${item.hinhAnh
+                    ? `<img src="${item.hinhAnh}" alt="${item.tenMon}" />`
+                    : '🍽️'}
+            </div>
+            <div class="cart-item-info">
+                <div class="cart-item-name">${item.tenMon}</div>
+                ${item.toppings && item.toppings.length > 0
+                    ? `<div class="cart-item-toppings">+ ${item.toppings.map(t => t.tenTopping).join(', ')}</div>`
+                    : ''}
+                <div class="cart-item-footer">
+                    <div class="cart-item-price">${formatVND(item.donGia * item.soLuong)}</div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <div class="cart-item-qty">
+                            <button class="cart-qty-btn" onclick="changeItemQty(${idx}, -1)">−</button>
+                            <span class="cart-qty-num">${item.soLuong}</span>
+                            <button class="cart-qty-btn" onclick="changeItemQty(${idx}, 1)">+</button>
+                        </div>
+                        <button class="cart-item-remove" onclick="removeItem(${idx})">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+
+    updateSummary();
+}
+
+function changeItemQty(idx, delta) {
+    cart[idx].soLuong = Math.max(1, cart[idx].soLuong + delta);
+    saveCart();
+    renderCart();
+}
+
+function removeItem(idx) {
+    cart.splice(idx, 1);
+    saveCart();
+    renderCart();
+}
+
+function clearCart() {
+    if (cart.length === 0) return;
+    if (!confirm('Xóa hết giỏ hàng?')) return;
+    cart = [];
+    promoData = null;
+    saveCart();
+    renderCart();
+}
+
+function saveCart() { localStorage.setItem(CART_KEY, JSON.stringify(cart)); }
+
+// ---- SUMMARY ----
+function updateSummary() {
+    const tongTien = cart.reduce((s, c) => s + c.donGia * c.soLuong, 0);
+    let giamGia = 0;
+
+    if (promoData) {
+        if (promoData.loaiGiam === 'PhanTram') {
+            giamGia = tongTien * promoData.giaTri / 100;
+            if (promoData.giamToiDa && giamGia > promoData.giamToiDa)
+                giamGia = promoData.giamToiDa;
+        } else {
+            giamGia = promoData.giaTri;
+        }
+        if (giamGia > tongTien) giamGia = tongTien;
+    }
+
+    document.getElementById('sumTamTinh').textContent = formatVND(tongTien);
+    document.getElementById('sumTotal').textContent = formatVND(tongTien - giamGia);
+
+    const discRow = document.getElementById('sumDiscountRow');
+    if (giamGia > 0) {
+        discRow.style.display = '';
+        document.getElementById('sumDiscount').textContent = '-' + formatVND(giamGia);
+    } else {
+        discRow.style.display = 'none';
+    }
+}
+
+// ---- PROMO CODE ----
+async function applyPromo() {
+    const code = document.getElementById('promoInput').value.trim();
+    const msg = document.getElementById('promoMsg');
+    if (!code) return;
+
+    const tongTien = cart.reduce((s, c) => s + c.donGia * c.soLuong, 0);
+
+    const res = await fetch('/Order/KiemTraMa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ maCode: code, tongTien })
+    });
+    const data = await res.json();
+
+    if (data.valid) {
+        if (data.donToiThieu && tongTien < data.donToiThieu) {
+            msg.innerHTML = `<span style="color:var(--danger)">⚠️ Đơn tối thiểu ${formatVND(data.donToiThieu)} để dùng mã này.</span>`;
+            promoData = null;
+        } else {
+            promoData = data;
+            msg.innerHTML = `<span style="color:var(--success)">✓ Áp dụng mã <strong>${code.toUpperCase()}</strong> - ${data.tenKM} thành công!</span>`;
+        }
+    } else {
+        promoData = null;
+        msg.innerHTML = `<span style="color:var(--danger)">✗ ${data.message}</span>`;
+    }
+    updateSummary();
+}
+
+// ---- DAT HANG ----
+async function datHang() {
+    const btn = document.getElementById('checkoutBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang đặt hàng...';
+
+    const promoCode = document.getElementById('promoInput').value.trim();
+    const ghiChu = document.getElementById('ghiChu').value.trim();
+
+    const body = {
+        token: TOKEN,
+        loaiDon: 'TaiCho',
+        maKhuyenMai: promoCode || null,
+        ghiChuChung: ghiChu,
+        items: cart.map(c => ({
+            monAnID: c.monAnID,
+            soLuong: c.soLuong,
+            donGia: c.donGia,
+            ghiChu: null,
+            toppingIDs: c.toppings?.map(t => t.toppingID) || []
+        }))
+    };
+
+    try {
+        const res = await fetch('/Order/DatHang', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
+
+        if (data.success) {
+            localStorage.removeItem(CART_KEY);
+            window.location.href = `/Order/XacNhan/${data.donHangId}?token=${TOKEN}`;
+        } else {
+            alert(data.message || 'Có lỗi xảy ra, vui lòng thử lại!');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-check-circle"></i> Đặt hàng';
+        }
+    } catch (e) {
+        alert('Lỗi kết nối. Vui lòng thử lại!');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-check-circle"></i> Đặt hàng';
+    }
+}
+
+// Init
+renderCart();
+</script>
+</body>
+</html>

@@ -1,0 +1,187 @@
+@model List<webHuyBeo.Models.Topping>
+@{
+    ViewData["Title"] = "Quản lý Topping";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+    var newTopping = new webHuyBeo.Models.Topping { TrangThai = "ConBan" };
+}
+
+<div style="display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start;">
+
+    <!-- Table -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Danh sách Topping (@Model.Count)</span>
+        </div>
+        <div class="table-container">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Tên topping</th>
+                        <th>Giá thêm</th>
+                        <th>Trạng thái</th>
+                        <th style="text-align:right">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="4">
+                                <div class="empty-state">
+                                    <i class="fas fa-plus-circle"></i>
+                                    <p>Chưa có topping nào. Thêm topping ở bên phải!</p>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    @foreach (var tp in Model)
+                    {
+                        <tr>
+                            <td style="font-weight:600">@tp.TenTopping</td>
+                            <td style="color:var(--primary);font-weight:600">+@string.Format("{0:N0}đ", tp.GiaThem)</td>
+                            <td>
+                                @if (tp.TrangThai == "ConBan")
+                                {
+                                    <span class="badge badge-success"><i class="fas fa-circle" style="font-size:7px;"></i> Còn hàng</span>
+                                }
+                                else
+                                {
+                                    <span class="badge badge-danger"><i class="fas fa-circle" style="font-size:7px;"></i> Hết hàng</span>
+                                }
+                            </td>
+                            <td style="text-align:right">
+                                <div style="display:flex;gap:6px;justify-content:flex-end;">
+                                    <button class="btn btn-outline btn-sm btn-icon" title="Chỉnh sửa"
+                                            onclick="openSuaModal(@tp.ToppingID, '@tp.TenTopping.Replace("'","\\'")', @tp.GiaThem, '@tp.TrangThai')">
+                                        <i class="fas fa-pen"></i>
+                                    </button>
+                                    <button class="btn btn-danger btn-sm btn-icon" title="Xóa"
+                                            onclick="confirmXoaTopping(@tp.ToppingID, '@tp.TenTopping.Replace("'","\\'")')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Add Form -->
+    <div style="position:sticky;top:84px;">
+        <div class="card">
+            <div class="card-header"><span class="card-title"><i class="fas fa-plus-circle" style="color:var(--primary)"></i> Thêm Topping mới</span></div>
+            <div class="card-body">
+                <form method="post" action="/Admin/TaoTopping">
+                    @Html.AntiForgeryToken()
+                    <div style="display:flex;flex-direction:column;gap:14px;">
+                        <div class="form-group">
+                            <label class="form-label">Tên topping <span class="required">*</span></label>
+                            <input type="text" name="TenTopping" class="form-control" placeholder="VD: Trân châu, Thêm trứng..." required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Giá thêm (đ) <span class="required">*</span></label>
+                            <input type="number" name="GiaThem" class="form-control" min="0" step="500" placeholder="VD: 5000" required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Trạng thái <span class="required">*</span></label>
+                            <select name="TrangThai" class="form-select">
+                                <option value="ConBan">Còn hàng</option>
+                                <option value="HetHang">Hết hàng</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">
+                            <i class="fas fa-plus"></i> Thêm Topping
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="suaModal">
+    <div class="modal" style="max-width:440px">
+        <div class="modal-header">
+            <span class="modal-title">Chỉnh sửa Topping</span>
+            <button class="modal-close" onclick="closeModal('suaModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <form method="post" action="/Admin/SuaTopping">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <input type="hidden" name="ToppingID" id="suaToppingID" />
+                <div style="display:flex;flex-direction:column;gap:14px;">
+                    <div class="form-group">
+                        <label class="form-label">Tên topping <span class="required">*</span></label>
+                        <input type="text" name="TenTopping" id="suaTenTopping" class="form-control" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Giá thêm (đ) <span class="required">*</span></label>
+                        <input type="number" name="GiaThem" id="suaGiaThem" class="form-control" min="0" step="500" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Trạng thái</label>
+                        <select name="TrangThai" id="suaTrangThai" class="form-select">
+                            <option value="ConBan">Còn hàng</option>
+                            <option value="HetHang">Hết hàng</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('suaModal')">Hủy</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Lưu thay đổi</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="modal-overlay" id="xoaToppingModal">
+    <div class="modal" style="max-width:400px">
+        <div class="modal-header">
+            <span class="modal-title" style="color:var(--danger)"><i class="fas fa-triangle-exclamation"></i> Xác nhận xóa</span>
+            <button class="modal-close" onclick="closeModal('xoaToppingModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <p>Bạn có chắc muốn xóa topping <strong id="xoaTenTopping"></strong>?</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('xoaToppingModal')">Hủy</button>
+            <form method="post" id="xoaToppingForm" style="margin:0">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-danger"><i class="fas fa-trash"></i> Xóa</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function openSuaModal(id, ten, gia, trangThai) {
+        document.getElementById('suaToppingID').value = id;
+        document.getElementById('suaTenTopping').value = ten;
+        document.getElementById('suaGiaThem').value = gia;
+        document.getElementById('suaTrangThai').value = trangThai;
+        document.getElementById('suaModal').classList.add('open');
+    }
+
+    function confirmXoaTopping(id, ten) {
+        document.getElementById('xoaTenTopping').textContent = ten;
+        document.getElementById('xoaToppingForm').action = '/Admin/XoaTopping/' + id;
+        document.getElementById('xoaToppingModal').classList.add('open');
+    }
+
+    function closeModal(id) {
+        document.getElementById(id).classList.remove('open');
+    }
+
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        overlay.addEventListener('click', function(e) {
+            if (e.target === this) this.classList.remove('open');
+        });
+    });
+</script>
+}

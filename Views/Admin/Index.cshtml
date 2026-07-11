@@ -1,0 +1,49 @@
+@{
+    ViewData["Title"] = "Dashboard";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+}
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon orange"><i class="fas fa-bowl-food"></i></div>
+        <div>
+            <div class="stat-label">Tổng món ăn</div>
+            <div class="stat-value">@ViewBag.TotalMonAn</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon green"><i class="fas fa-plus-circle"></i></div>
+        <div>
+            <div class="stat-label">Tổng topping</div>
+            <div class="stat-value">@ViewBag.TotalTopping</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon blue"><i class="fas fa-receipt"></i></div>
+        <div>
+            <div class="stat-label">Tổng đơn hàng</div>
+            <div class="stat-value">@ViewBag.TotalDonHang</div>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon red"><i class="fas fa-coins"></i></div>
+        <div>
+            <div class="stat-label">Doanh thu hôm nay</div>
+            <div class="stat-value">@string.Format("{0:N0}đ", ViewBag.DoanhThuHomNay)</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <span class="card-title">👋 Chào mừng đến Huy Béo Admin</span>
+    </div>
+    <div class="card-body">
+        <p style="color: var(--text-muted); margin-bottom: 20px;">Bắt đầu quản lý quán ăn của bạn từ menu bên trái.</p>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <a href="/Admin/MonAn" class="btn btn-primary"><i class="fas fa-bowl-food"></i> Quản lý Món ăn</a>
+            <a href="/Admin/Topping" class="btn btn-outline"><i class="fas fa-plus-circle"></i> Quản lý Topping</a>
+            <a href="/Admin/DanhMuc" class="btn btn-outline"><i class="fas fa-tags"></i> Quản lý Danh mục</a>
+        </div>
+    </div>
+</div>

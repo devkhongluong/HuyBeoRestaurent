@@ -1,0 +1,118 @@
+@model webHuyBeo.Models.DonHang
+@{
+    Layout = null;
+    var token = ViewBag.Token as string;
+    var steps = new[] { "ChoXacNhan", "DaXacNhan", "DangCheBien", "SanSangPhucVu", "DaHoanThanh" };
+    var stepLabels = new[] { "Đặt hàng", "Xác nhận", "Đang làm", "Sẵn sàng", "Hoàn thành" };
+    var stepIcons = new[] { "fa-check", "fa-thumbs-up", "fa-fire", "fa-bell", "fa-circle-check" };
+    int currentStep = Array.IndexOf(steps, Model.TrangThai);
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Đặt hàng thành công - Huy Béo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="~/css/order.css" />
+</head>
+<body style="background: var(--bg);">
+
+<div class="confirm-page">
+
+    <!-- Success Icon -->
+    <div class="confirm-icon">✅</div>
+
+    <h1 class="confirm-title">Đặt hàng thành công!</h1>
+    <p class="confirm-sub">Nhân viên sẽ xác nhận đơn của bạn sớm nhất có thể</p>
+
+    <!-- Order Number -->
+    <div class="order-number">
+        <div class="order-num-label">Số thứ tự của bạn</div>
+        <div class="order-num-value">@Model.SoThuTu</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:6px;">
+            Đặt lúc @Model.NgayTao.ToString("HH:mm - dd/MM/yyyy")
+        </div>
+    </div>
+
+    <!-- Status Tracker -->
+    <div class="status-track">
+        @for (int i = 0; i < steps.Length; i++)
+        {
+            string dotClass = i < currentStep ? "done" : (i == currentStep ? "active" : "");
+            <div class="status-step">
+                <div class="step-dot @dotClass">
+                    @if (i < currentStep)
+                    {
+                        <i class="fas fa-check" style="font-size:11px;"></i>
+                    }
+                    else if (i == currentStep)
+                    {
+                        <i class="fas @stepIcons[i]" style="font-size:11px;"></i>
+                    }
+                    else
+                    {
+                        <span style="font-size:10px;font-weight:700;">@(i + 1)</span>
+                    }
+                </div>
+                <span class="step-label">@stepLabels[i]</span>
+            </div>
+        }
+    </div>
+
+    <!-- Order Items -->
+    <div class="confirm-items">
+        @foreach (var ct in Model.ChiTietDons)
+        {
+            <div class="confirm-item">
+                <div>
+                    <span class="confirm-item-name">@ct.MonAn?.TenMon</span>
+                    <span style="color:var(--text-muted);font-size:12px;"> x@ct.SoLuong</span>
+                </div>
+                <span class="confirm-item-price">@string.Format("{0:N0}đ", ct.ThanhTien)</span>
+            </div>
+        }
+        @if (Model.TongGiamGia.HasValue && Model.TongGiamGia > 0)
+        {
+            <div class="confirm-item">
+                <span style="color:var(--success)"><i class="fas fa-tag"></i> Giảm giá</span>
+                <span style="color:var(--success)">-@string.Format("{0:N0}đ", Model.TongGiamGia)</span>
+            </div>
+        }
+        <div class="confirm-total">
+            <span>Tổng cộng</span>
+            <span>@string.Format("{0:N0}đ", Model.ThanhTien)</span>
+        </div>
+    </div>
+
+    <!-- Info -->
+    <div style="background:var(--primary-light);border-radius:var(--radius);padding:14px 16px;width:100%;max-width:340px;text-align:left;margin-bottom:24px;">
+        <div style="font-size:13px;color:var(--primary);font-weight:600;margin-bottom:4px;">
+            <i class="fas fa-info-circle"></i> Lưu ý
+        </div>
+        <div style="font-size:13px;color:var(--text);">
+            Thanh toán tại quầy khi nhận hàng. Hãy chú ý màn hình để biết khi nào món sẵn sàng.
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div style="display:flex;flex-direction:column;gap:10px;width:100%;max-width:340px;">
+        <button onclick="checkStatus()" style="padding:14px;background:var(--primary);color:#fff;border:none;border-radius:var(--radius);font-size:15px;font-weight:700;cursor:pointer;" id="refreshBtn">
+            <i class="fas fa-rotate-right"></i> Cập nhật trạng thái
+        </button>
+    </div>
+</div>
+
+<script>
+async function checkStatus() {
+    const btn = document.getElementById('refreshBtn');
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang kiểm tra...';
+    btn.disabled = true;
+    // Reload page to check latest status
+    setTimeout(() => window.location.reload(), 500);
+}
+</script>
+</body>
+</html>

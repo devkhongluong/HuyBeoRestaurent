@@ -1,0 +1,168 @@
+@model List<webHuyBeo.Models.DanhMuc>
+@{
+    ViewData["Title"] = "Quản lý Danh mục";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+}
+
+<div style="display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start;">
+
+    <!-- Table -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Danh sách Danh mục (@Model.Count)</span>
+        </div>
+        <div class="table-container">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Thứ tự</th>
+                        <th>Tên danh mục</th>
+                        <th>Mô tả</th>
+                        <th style="text-align:right">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Any())
+                    {
+                        <tr>
+                            <td colspan="4">
+                                <div class="empty-state">
+                                    <i class="fas fa-tags"></i>
+                                    <p>Chưa có danh mục nào. Thêm danh mục ở bên phải!</p>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    @foreach (var dm in Model)
+                    {
+                        <tr>
+                            <td style="color:var(--text-muted);font-weight:600;font-size:16px;">@dm.ThuTu</td>
+                            <td style="font-weight:600">@dm.TenDanhMuc</td>
+                            <td style="color:var(--text-muted);font-size:13px;">@dm.MoTa</td>
+                            <td style="text-align:right">
+                                <div style="display:flex;gap:6px;justify-content:flex-end;">
+                                    <button class="btn btn-outline btn-sm btn-icon" title="Chỉnh sửa"
+                                            onclick="openSuaDanhMuc(@dm.DanhMucID, '@dm.TenDanhMuc.Replace("'","\\'")', '@(dm.MoTa?.Replace("'", "\\'") ?? "")', @(dm.ThuTu?.ToString() ?? "null"))">
+                                        <i class="fas fa-pen"></i>
+                                    </button>
+                                    <button class="btn btn-danger btn-sm btn-icon" title="Xóa"
+                                            onclick="confirmXoaDanhMuc(@dm.DanhMucID, '@dm.TenDanhMuc.Replace("'","\\'")')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Add Form -->
+    <div style="position:sticky;top:84px;">
+        <div class="card">
+            <div class="card-header"><span class="card-title"><i class="fas fa-tags" style="color:var(--primary)"></i> Thêm Danh mục mới</span></div>
+            <div class="card-body">
+                <form method="post" action="/Admin/TaoDanhMuc">
+                    @Html.AntiForgeryToken()
+                    <div style="display:flex;flex-direction:column;gap:14px;">
+                        <div class="form-group">
+                            <label class="form-label">Tên danh mục <span class="required">*</span></label>
+                            <input type="text" name="TenDanhMuc" class="form-control" placeholder="VD: Món chính, Đồ uống..." required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Mô tả</label>
+                            <textarea name="MoTa" class="form-control" placeholder="Mô tả danh mục..."></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Thứ tự hiển thị</label>
+                            <input type="number" name="ThuTu" class="form-control" min="1" placeholder="VD: 1, 2, 3..." />
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">
+                            <i class="fas fa-plus"></i> Thêm Danh mục
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="suaDanhMucModal">
+    <div class="modal" style="max-width:460px">
+        <div class="modal-header">
+            <span class="modal-title">Chỉnh sửa Danh mục</span>
+            <button class="modal-close" onclick="closeModal('suaDanhMucModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <form method="post" action="/Admin/SuaDanhMuc">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <input type="hidden" name="DanhMucID" id="suaDanhMucID" />
+                <div style="display:flex;flex-direction:column;gap:14px;">
+                    <div class="form-group">
+                        <label class="form-label">Tên danh mục <span class="required">*</span></label>
+                        <input type="text" name="TenDanhMuc" id="suaTenDanhMuc" class="form-control" required />
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Mô tả</label>
+                        <textarea name="MoTa" id="suaMoTaDanhMuc" class="form-control"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Thứ tự hiển thị</label>
+                        <input type="number" name="ThuTu" id="suaThuTu" class="form-control" min="1" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('suaDanhMucModal')">Hủy</button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Lưu thay đổi</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal-overlay" id="xoaDanhMucModal">
+    <div class="modal" style="max-width:400px">
+        <div class="modal-header">
+            <span class="modal-title" style="color:var(--danger)"><i class="fas fa-triangle-exclamation"></i> Xác nhận xóa</span>
+            <button class="modal-close" onclick="closeModal('xoaDanhMucModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <p>Bạn có chắc muốn xóa danh mục <strong id="xoaTenDanhMuc"></strong>?</p>
+            <p style="color:var(--danger);font-size:13px;margin-top:8px;"><i class="fas fa-exclamation-triangle"></i> Các món ăn thuộc danh mục này cũng sẽ bị ảnh hưởng!</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('xoaDanhMucModal')">Hủy</button>
+            <form method="post" id="xoaDanhMucForm" style="margin:0">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="btn btn-danger"><i class="fas fa-trash"></i> Xóa</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function openSuaDanhMuc(id, ten, moTa, thuTu) {
+        document.getElementById('suaDanhMucID').value = id;
+        document.getElementById('suaTenDanhMuc').value = ten;
+        document.getElementById('suaMoTaDanhMuc').value = moTa;
+        document.getElementById('suaThuTu').value = thuTu || '';
+        document.getElementById('suaDanhMucModal').classList.add('open');
+    }
+
+    function confirmXoaDanhMuc(id, ten) {
+        document.getElementById('xoaTenDanhMuc').textContent = ten;
+        document.getElementById('xoaDanhMucForm').action = '/Admin/XoaDanhMuc/' + id;
+        document.getElementById('xoaDanhMucModal').classList.add('open');
+    }
+
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+    });
+</script>
+}

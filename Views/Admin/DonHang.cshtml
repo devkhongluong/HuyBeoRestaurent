@@ -1,0 +1,260 @@
+@model List<webHuyBeo.Models.DonHang>
+@{
+    ViewData["Title"] = "Quản lý Đơn hàng";
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+
+    var statusBadge = new Dictionary<string, (string, string, string)> {
+        { "ChoXacNhan",     ("badge-warning", "Chờ xác nhận", "fa-clock") },
+        { "DaXacNhan",      ("badge-info",    "Đã xác nhận",  "fa-check") },
+        { "DangCheBien",    ("badge-warning", "Đang chế biến","fa-fire") },
+        { "SanSangPhucVu",  ("badge-success", "Sẵn sàng",     "fa-bell") },
+        { "DaHoanThanh",    ("badge-success", "Hoàn thành",   "fa-circle-check") },
+        { "Huy",            ("badge-danger",  "Đã hủy",       "fa-ban") },
+    };
+}
+
+<!-- Filter Bar -->
+<div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
+    <form method="get" action="/Admin/DonHang" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <select name="trangThai" class="form-select" style="width:auto;" onchange="this.form.submit()">
+            <option value="">Tất cả trạng thái</option>
+            @foreach (var s in statusBadge)
+            {
+                if (ViewBag.TrangThai == s.Key)
+                {
+                    <option value="@s.Key" selected>@s.Value.Item2</option>
+                }
+                else
+                {
+                    <option value="@s.Key">@s.Value.Item2</option>
+                }
+            }
+        </select>
+        <select name="loaiDon" class="form-select" style="width:auto;" onchange="this.form.submit()">
+            <option value="">Tất cả loại</option>
+            @if (ViewBag.LoaiDon == "TaiCho")
+            {
+                <option value="TaiCho" selected>Tại chỗ</option>
+                <option value="MangDi">Mang về</option>
+            }
+            else if (ViewBag.LoaiDon == "MangDi")
+            {
+                <option value="TaiCho">Tại chỗ</option>
+                <option value="MangDi" selected>Mang về</option>
+            }
+            else
+            {
+                <option value="TaiCho">Tại chỗ</option>
+                <option value="MangDi">Mang về</option>
+            }
+        </select>
+        @if (ViewBag.TrangThai != null || ViewBag.LoaiDon != null)
+        {
+            <a href="/Admin/DonHang" class="btn btn-outline btn-sm"><i class="fas fa-times"></i> Xóa lọc</a>
+        }
+    </form>
+    <div style="margin-left:auto;color:var(--text-muted);font-size:13px;">
+        <strong>@ViewBag.Total</strong> đơn hàng
+    </div>
+</div>
+
+<!-- Table -->
+<div class="card">
+    <div class="table-container">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Số TT</th>
+                    <th>Loại đơn</th>
+                    <th>Món ăn</th>
+                    <th>Tổng tiền</th>
+                    <th>Thanh toán</th>
+                    <th>Trạng thái</th>
+                    <th>Thời gian</th>
+                    <th style="text-align:right">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr>
+                        <td colspan="8">
+                            <div class="empty-state">
+                                <i class="fas fa-receipt"></i>
+                                <p>Chưa có đơn hàng nào.</p>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                @foreach (var don in Model)
+                {
+                    var sbInfo = statusBadge.ContainsKey(don.TrangThai)
+                        ? statusBadge[don.TrangThai]
+                        : ("badge-info", don.TrangThai, "fa-circle");
+                    var sbCls = sbInfo.Item1;
+                    var sbLabel = sbInfo.Item2;
+                    var sbIcon = sbInfo.Item3;
+                    <tr>
+                        <td>
+                            <span style="font-weight:700;font-size:16px;color:var(--primary)">@don.SoThuTu</span>
+                        </td>
+                        <td>
+                            @if (don.LoaiDon == "TaiCho")
+                            {
+                                <span class="badge badge-info">🪑 Tại chỗ</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-warning">🛍️ Mang về</span>
+                            }
+                        </td>
+                        <td style="font-size:13px;max-width:200px;">
+                            @{
+                                var monList = don.ChiTietDons?.Select(c => $"{c.MonAn?.TenMon} x{c.SoLuong}").ToList();
+                                var monStr = monList != null && monList.Any() ? string.Join(", ", monList.Take(2)) + (monList.Count > 2 ? $" +{monList.Count - 2} món" : "") : "-";
+                            }
+                            <span title="@string.Join(", ", don.ChiTietDons?.Select(c => c.MonAn?.TenMon) ?? new List<string?>())">@monStr</span>
+                        </td>
+                        <td style="font-weight:700;">@string.Format("{0:N0}đ", don.ThanhTien)</td>
+                        <td>
+                            @if (don.TrangThaiTT == "DaThanhToan")
+                            {
+                                <span class="badge badge-success"><i class="fas fa-check"></i> Đã TT</span>
+                            }
+                            else
+                            {
+                                <span class="badge badge-warning">Chưa TT</span>
+                            }
+                        </td>
+                        <td>
+                            <span class="badge @sbCls">
+                                <i class="fas @sbIcon" style="font-size:9px;"></i>
+                                @sbLabel
+                            </span>
+                        </td>
+                        <td style="font-size:12px;color:var(--text-muted);">
+                            <div>@don.NgayTao.ToString("HH:mm")</div>
+                            <div>@don.NgayTao.ToString("dd/MM/yyyy")</div>
+                        </td>
+                        <td style="text-align:right">
+                            <div style="display:flex;gap:6px;justify-content:flex-end;">
+                                <button class="btn btn-outline btn-sm btn-icon" title="Xem chi tiết"
+                                        onclick="openChiTietDon(@don.DonHangID)">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                @if (don.TrangThai != "DaHoanThanh" && don.TrangThai != "Huy")
+                                {
+                                    <form method="post" action="/Admin/HuyDon/@don.DonHangID" style="margin:0" onsubmit="return confirm('Hủy đơn @don.SoThuTu?')">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="btn btn-danger btn-sm btn-icon" title="Hủy đơn">
+                                            <i class="fas fa-ban"></i>
+                                        </button>
+                                    </form>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    @if (ViewBag.TotalPages > 1)
+    {
+        <div class="pagination">
+            @for (int i = 1; i <= ViewBag.TotalPages; i++)
+            {
+                var isActive = i == ViewBag.Page;
+                <a href="/Admin/DonHang?page=@i&trangThai=@ViewBag.TrangThai&loaiDon=@ViewBag.LoaiDon"
+                   class="page-link @(isActive ? "active" : "")">@i</a>
+            }
+        </div>
+    }
+</div>
+
+<!-- Chi Tiet Don Modal -->
+<div class="modal-overlay" id="chiTietModal">
+    <div class="modal" style="max-width:560px">
+        <div class="modal-header">
+            <span class="modal-title" id="chiTietTitle">Chi tiết đơn hàng</span>
+            <button class="modal-close" onclick="closeModal('chiTietModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body" id="chiTietBody" style="min-height:100px;display:flex;align-items:center;justify-content:center;">
+            <i class="fas fa-spinner fa-spin" style="font-size:24px;color:var(--primary)"></i>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    // Embed order data for modal
+    var donHangData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Select(d => new {
+        d.DonHangID, d.SoThuTu, d.LoaiDon, d.TrangThai, d.TrangThaiTT,
+        d.TongTien, d.TongGiamGia, d.ThanhTien, d.PhuongThucTT,
+        NgayTao = d.NgayTao.ToString("HH:mm dd/MM/yyyy"),
+        ChiTiet = d.ChiTietDons?.Select(c => new {
+            TenMon = c.MonAn?.TenMon ?? "?",
+            c.SoLuong, c.DonGia, c.ThanhTien, c.GhiChu, c.TrangThaiBep
+        })
+    })));
+
+    function openChiTietDon(id) {
+        var don = donHangData.find(d => d.donHangID === id);
+        if (!don) return;
+
+        document.getElementById('chiTietTitle').textContent = `Chi tiết đơn ${don.soThuTu}`;
+        var loai = don.loaiDon === 'TaiCho' ? '🪑 Tại chỗ' : '🛍️ Mang về';
+        var rows = (don.chiTiet || []).map(c =>
+            `<tr>
+                <td>${c.tenMon}</td>
+                <td style="text-align:center">${c.soLuong}</td>
+                <td style="text-align:right">${formatVND(c.donGia)}</td>
+                <td style="text-align:right;font-weight:600">${formatVND(c.thanhTien)}</td>
+            </tr>`
+        ).join('');
+
+        document.getElementById('chiTietBody').innerHTML = `
+            <div style="width:100%">
+                <div style="display:flex;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+                    <div><span style="color:var(--text-muted);font-size:12px;">Loại đơn</span><br/><strong>${loai}</strong></div>
+                    <div><span style="color:var(--text-muted);font-size:12px;">Thời gian</span><br/><strong>${don.ngayTao}</strong></div>
+                    <div><span style="color:var(--text-muted);font-size:12px;">Trạng thái</span><br/><strong>${don.trangThai}</strong></div>
+                </div>
+                <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                    <thead>
+                        <tr style="background:var(--bg)">
+                            <th style="padding:8px;text-align:left;border-bottom:1px solid var(--border)">Món ăn</th>
+                            <th style="padding:8px;text-align:center;border-bottom:1px solid var(--border)">SL</th>
+                            <th style="padding:8px;text-align:right;border-bottom:1px solid var(--border)">Đơn giá</th>
+                            <th style="padding:8px;text-align:right;border-bottom:1px solid var(--border)">Thành tiền</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+                <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:14px;">
+                    <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text-muted);">
+                        <span>Tạm tính</span><span>${formatVND(don.tongTien)}</span>
+                    </div>
+                    ${don.tongGiamGia ? `<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--success);">
+                        <span>Giảm giá</span><span>-${formatVND(don.tongGiamGia)}</span>
+                    </div>` : ''}
+                    <div style="display:flex;justify-content:space-between;font-size:16px;font-weight:700;margin-top:8px;">
+                        <span>Thành tiền</span><span style="color:var(--primary)">${formatVND(don.thanhTien)}</span>
+                    </div>
+                    <div style="font-size:12px;color:var(--text-muted);margin-top:6px;">
+                        TT: ${don.trangThaiTT === 'DaThanhToan' ? '✅ Đã thanh toán' : '⏳ Chưa thanh toán'}
+                        ${don.phuongThucTT ? `(${don.phuongThucTT})` : ''}
+                    </div>
+                </div>
+            </div>`;
+        document.getElementById('chiTietModal').classList.add('open');
+    }
+
+    function formatVND(n) { return new Intl.NumberFormat('vi-VN').format(n) + 'đ'; }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+    document.querySelectorAll('.modal-overlay').forEach(o => {
+        o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
+    });
+</script>
+}
