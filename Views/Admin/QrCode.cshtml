@@ -6,7 +6,6 @@
 
 <div style="max-width:720px;margin:0 auto;">
     <div style="display:grid;gap:20px;">
-
         <!-- QR Card -->
         <div class="card">
             <div class="card-header">
@@ -23,6 +22,15 @@
                     <!-- Info -->
                     <div style="display:flex;flex-direction:column;gap:16px;">
                         <div>
+                            <div style="font-size:12px;color:var(--text-muted);font-weight:600;margin-bottom:4px;">CHỌN ĐỊA CHỈ IP MÁY CHỦ (Wi-Fi/LAN)</div>
+                            <select id="ipSelect" class="form-select" onchange="changeIP(this.value)" style="margin-bottom:12px;">
+                                @foreach (var ip in ViewBag.DetectedIps as List<string> ?? new List<string>())
+                                {
+                                    <option value="@ip">@ip (Mạng nội bộ)</option>
+                                }
+                                <option value="localhost">localhost (Chỉ máy này)</option>
+                            </select>
+                            
                             <div style="font-size:12px;color:var(--text-muted);font-weight:600;margin-bottom:4px;">ĐƯỜNG LINK ĐẶT MÓN</div>
                             <div style="display:flex;align-items:center;gap:8px;">
                                 <input type="text" id="orderUrlInput" class="form-control" value="@orderUrl" readonly style="font-family:monospace;font-size:12px;" />
@@ -48,7 +56,7 @@
                             <button class="btn btn-outline" onclick="window.print()">
                                 <i class="fas fa-print"></i> In QR
                             </button>
-                            <a href="@orderUrl" target="_blank" class="btn btn-outline">
+                            <a href="@orderUrl" id="orderLinkBtn" target="_blank" class="btn btn-outline">
                                 <i class="fas fa-external-link-alt"></i> Mở trang đặt món
                             </a>
                         </div>
@@ -56,7 +64,6 @@
                 </div>
             </div>
         </div>
-
         <!-- Instructions Card -->
         <div class="card">
             <div class="card-header"><span class="card-title">Hướng dẫn sử dụng QR</span></div>
@@ -111,6 +118,8 @@
 <script>
     var currentSize = 200;
     var qr = null;
+    var scheme = '@ViewBag.Scheme';
+    var port = '@ViewBag.Port';
     var orderUrl = '@Html.Raw(orderUrl)';
 
     function generateQR(size) {
@@ -123,6 +132,15 @@
             colorLight: '#ffffff',
             correctLevel: QRCode.CorrectLevel.H
         });
+    }
+
+    function changeIP(ip) {
+        orderUrl = `${scheme}://${ip}:${port}/Order/BatDau`;
+        document.getElementById('orderUrlInput').value = orderUrl;
+        document.getElementById('orderLinkBtn').href = orderUrl;
+        var displayEl = document.getElementById('displayOrderUrl');
+        if (displayEl) displayEl.textContent = orderUrl;
+        generateQR(currentSize);
     }
 
     function setSize(size) {
