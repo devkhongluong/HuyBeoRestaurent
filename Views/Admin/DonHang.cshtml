@@ -197,7 +197,7 @@
             TenMon = c.MonAn?.TenMon ?? "?",
             c.SoLuong, c.DonGia, c.ThanhTien, c.GhiChu, c.TrangThaiBep
         })
-    })));
+    }), new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
 
     function openChiTietDon(id) {
         var don = donHangData.find(d => d.donHangID === id);

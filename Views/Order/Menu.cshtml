@@ -154,7 +154,7 @@
 
 <script>
 // ---- MENU DATA ----
-const menuData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(menuData));
+const menuData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(menuData, new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
 const TOKEN = '@token';
 const CART_KEY = 'cart_' + TOKEN;
 

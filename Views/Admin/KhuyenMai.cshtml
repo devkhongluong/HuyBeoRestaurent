@@ -268,7 +268,7 @@
         k.SoLuongToiDa, k.SoLuongDaDung, k.TrangThai,
         NgayBatDau = k.NgayBatDau.ToString("yyyy-MM-dd"),
         NgayKetThuc = k.NgayKetThuc.ToString("yyyy-MM-dd")
-    })));
+    }), new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }));
 
     function openSuaKM(id) {
         var km = kmData.find(k => k.khuyenMaiID === id);

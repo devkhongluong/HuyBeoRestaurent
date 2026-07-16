@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
@@ -5,6 +6,7 @@ using webHuyBeo.Models;
 
 namespace webHuyBeo.Controllers
 {
+    [Authorize(Roles = "Admin,QuanLy")]
     public class AdminController : Controller
     {
         private readonly ApplicationDbContext _db;
@@ -505,8 +507,37 @@ namespace webHuyBeo.Controllers
         {
             ViewData["Title"] = "Mã QR Quét Đặt món";
             ViewData["ActiveMenu"] = "qr";
-            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+
+            // Lấy danh sách tất cả các IP IPv4 hợp lệ của máy
+            var ips = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+                .Where(n => n.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up && 
+                            n.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
+                .SelectMany(n => n.GetIPProperties().UnicastAddresses)
+                .Where(a => a.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                .Select(a => a.Address.ToString())
+                .ToList();
+
+            // Sắp xếp ưu tiên IP Wi-Fi/Ethernet thông thường (thường là 192.168.1.x hoặc 192.168.0.x)
+            ips = ips.OrderByDescending(ip => ip.StartsWith("192.168.1.") || ip.StartsWith("192.168.0."))
+                     .ThenByDescending(ip => ip.StartsWith("192.168."))
+                     .ToList();
+
+            var defaultIp = ips.FirstOrDefault() ?? "127.0.0.1";
+            var host = Request.Host.Value;
+
+            // Nếu đang truy cập bằng localhost/127.0.0.1 trên máy, thay thế bằng IP LAN để quét QR
+            if (Request.Host.Host == "localhost" || Request.Host.Host == "127.0.0.1")
+            {
+                var port = Request.Host.Port;
+                host = port.HasValue ? $"{defaultIp}:{port}" : defaultIp;
+            }
+
+            var baseUrl = $"{Request.Scheme}://{host}";
             ViewBag.OrderUrl = $"{baseUrl}/Order/BatDau";
+            ViewBag.DetectedIps = ips;
+            ViewBag.Port = Request.Host.Port ?? 5000;
+            ViewBag.Scheme = Request.Scheme;
+            
             return View();
         }
 

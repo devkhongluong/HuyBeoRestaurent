@@ -1,0 +1,267 @@
+@model List<webHuyBeo.Models.DonHang>
+@{
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+    ViewData["Title"] = "Bếp (KDS)";
+    ViewData["ActiveMenu"] = "bep";
+}
+
+<link rel="stylesheet" href="~/css/bep.css" asp-append-version="true" />
+
+<!-- KDS Header -->
+<div class="kds-header">
+    <div class="kds-info">
+        <span class="kds-count">
+            <i class="fas fa-fire"></i>
+            <strong>@Model.Count</strong> đơn cần xử lý
+        </span>
+        <span class="kds-time" id="kdsTime"></span>
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="location.reload()">
+        <i class="fas fa-sync-alt"></i> Làm mới
+    </button>
+</div>
+
+@if (Model.Count == 0)
+{
+    <div class="kds-empty">
+        <div class="kds-empty-icon">
+            <i class="fas fa-check-double"></i>
+        </div>
+        <h3>Không có đơn nào đang chờ</h3>
+        <p>Tất cả các đơn đã được hoàn thành. Nghỉ ngơi một chút! 🎉</p>
+    </div>
+}
+else
+{
+    <div class="kds-grid">
+        @foreach (var don in Model)
+        {
+            var isPreparing = don.TrangThai == "DangCheBien";
+            var timeAgo = (DateTime.Now - don.NgayTao);
+            var totalItems = don.ChiTietDons.Count;
+            var doneItems = don.ChiTietDons.Count(c => c.TrangThaiBep == "HoanThanh");
+            var urgentClass = timeAgo.TotalMinutes > 15 ? "urgent" : timeAgo.TotalMinutes > 10 ? "warning" : "";
+
+            <div class="kds-card @(isPreparing ? "preparing" : "waiting") @urgentClass" id="kds-@don.DonHangID">
+                <!-- Card Header -->
+                <div class="kds-card-header">
+                    <div class="kds-order-info">
+                        <span class="kds-order-num">#@don.SoThuTu</span>
+                        <span class="kds-order-type">@(don.LoaiDon == "MangDi" ? "🛍️ Mang đi" : "🍽️ Tại chỗ")</span>
+                    </div>
+                    <div class="kds-timer @urgentClass" data-start="@don.NgayTao.ToString("o")">
+                        <i class="fas fa-stopwatch"></i>
+                        <span class="timer-value">00:00</span>
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                @if (isPreparing)
+                {
+                    var progress = totalItems > 0 ? (int)((double)doneItems / totalItems * 100) : 0;
+                    <div class="kds-progress">
+                        <div class="kds-progress-bar" style="width: @(progress)%"></div>
+                        <span class="kds-progress-text">@doneItems / @totalItems món</span>
+                    </div>
+                }
+
+                <!-- Items List -->
+                <div class="kds-items">
+                    @foreach (var ct in don.ChiTietDons.OrderBy(c => c.TrangThaiBep == "HoanThanh" ? 1 : 0))
+                    {
+                        var isDone = ct.TrangThaiBep == "HoanThanh";
+                        <div class="kds-item @(isDone ? "done" : "")" id="item-@ct.ChiTietID">
+                            <div class="kds-item-left">
+                                @if (isPreparing)
+                                {
+                                    if (isDone)
+                                    {
+                                        <button class="kds-check checked" onclick="hoanLai(@ct.ChiTietID)" title="Hoàn tác">
+                                            <i class="fas fa-check"></i>
+                                        </button>
+                                    }
+                                    else
+                                    {
+                                        <button class="kds-check" onclick="xongMon(@ct.ChiTietID, @don.DonHangID)" title="Đánh dấu xong">
+                                            <i class="far fa-circle"></i>
+                                        </button>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="kds-bullet"></span>
+                                }
+                                <div class="kds-item-info">
+                                    <div class="kds-item-main">
+                                        <span class="kds-item-qty">@(ct.SoLuong)x</span>
+                                        <span class="kds-item-name">@ct.MonAn.TenMon</span>
+                                    </div>
+                                    @if (ct.ChiTietToppings != null && ct.ChiTietToppings.Any())
+                                    {
+                                        <div class="kds-item-toppings">
+                                            @foreach (var tp in ct.ChiTietToppings)
+                                            {
+                                                <span>+ @tp.Topping.TenTopping</span>
+                                            }
+                                        </div>
+                                    }
+                                    @if (!string.IsNullOrEmpty(ct.GhiChu))
+                                    {
+                                        <div class="kds-item-note">
+                                            <i class="fas fa-pen"></i> @ct.GhiChu
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <!-- Card Actions -->
+                <div class="kds-card-actions">
+                    @if (!isPreparing)
+                    {
+                        <button class="kds-btn start" onclick="batDauLam(@don.DonHangID)">
+                            <i class="fas fa-play"></i> Bắt đầu làm
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="kds-btn done" onclick="xongDon(@don.DonHangID)">
+                            <i class="fas fa-check-double"></i> Xong đơn
+                        </button>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@section Scripts {
+<script>
+    // Update all timers
+    function updateTimers() {
+        document.querySelectorAll('.kds-timer').forEach(el => {
+            const start = new Date(el.dataset.start);
+            const now = new Date();
+            const diff = Math.floor((now - start) / 1000);
+            const mins = Math.floor(diff / 60);
+            const secs = diff % 60;
+            el.querySelector('.timer-value').textContent =
+                `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+            // Update urgency classes
+            const card = el.closest('.kds-card');
+            if (mins >= 15) {
+                el.classList.add('urgent');
+                card.classList.add('urgent');
+                card.classList.remove('warning');
+            } else if (mins >= 10) {
+                el.classList.add('warning');
+                card.classList.add('warning');
+            }
+        });
+    }
+    setInterval(updateTimers, 1000);
+    updateTimers();
+
+    // Update KDS clock
+    function updateKdsClock() {
+        const now = new Date();
+        const el = document.getElementById('kdsTime');
+        if (el) el.textContent = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+    setInterval(updateKdsClock, 1000);
+    updateKdsClock();
+
+    // Start preparing order
+    async function batDauLam(id) {
+        const res = await fetch(`/Bep/BatDauLam`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `id=${id}`
+        });
+        const data = await res.json();
+        if (data.success) location.reload();
+        else alert(data.message);
+    }
+
+    // Mark single item as done
+    async function xongMon(chiTietId, donId) {
+        const res = await fetch(`/Bep/XongMon`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `chiTietId=${chiTietId}`
+        });
+        const data = await res.json();
+        if (data.success) {
+            const item = document.getElementById(`item-${chiTietId}`);
+            item.classList.add('done');
+            const btn = item.querySelector('.kds-check');
+            btn.classList.add('checked');
+            btn.innerHTML = '<i class="fas fa-check"></i>';
+            btn.setAttribute('onclick', `hoanLai(${chiTietId})`);
+
+            // Update progress bar
+            const card = document.getElementById(`kds-${donId}`);
+            const total = card.querySelectorAll('.kds-item').length;
+            const done = card.querySelectorAll('.kds-item.done').length;
+            const progressBar = card.querySelector('.kds-progress-bar');
+            const progressText = card.querySelector('.kds-progress-text');
+            if (progressBar) {
+                progressBar.style.width = `${(done / total * 100)}%`;
+                progressText.textContent = `${done} / ${total} món`;
+            }
+
+            // If all done, offer to complete order
+            if (data.allDone) {
+                const actionsDiv = card.querySelector('.kds-card-actions');
+                actionsDiv.innerHTML = `
+                    <button class="kds-btn done pulse" onclick="xongDon(${donId})">
+                        <i class="fas fa-check-double"></i> Tất cả xong — Hoàn thành đơn!
+                    </button>`;
+            }
+        }
+    }
+
+    // Undo item
+    async function hoanLai(chiTietId) {
+        const res = await fetch(`/Bep/HoanLai`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `chiTietId=${chiTietId}`
+        });
+        const data = await res.json();
+        if (data.success) location.reload();
+    }
+
+    // Complete entire order
+    async function xongDon(id) {
+        const res = await fetch(`/Bep/XongDon`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `id=${id}`
+        });
+        const data = await res.json();
+        if (data.success) {
+            const card = document.getElementById(`kds-${id}`);
+            card.style.transition = 'all 0.4s ease';
+            card.style.opacity = '0';
+            card.style.transform = 'scale(0.9)';
+            setTimeout(() => {
+                card.remove();
+                // Check if empty
+                const remaining = document.querySelectorAll('.kds-card').length;
+                if (remaining === 0) location.reload();
+                // Update counter
+                const counter = document.querySelector('.kds-count strong');
+                if (counter) counter.textContent = remaining;
+            }, 400);
+        }
+        else alert(data.message);
+    }
+
+    // Auto-refresh every 20 seconds
+    setInterval(() => location.reload(), 20000);
+</script>
+}

@@ -1,0 +1,448 @@
+/* ===========================
+   KDS Bếp - Huy Béo
+   =========================== */
+
+/* ---- KDS HEADER ---- */
+.kds-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding: 16px 20px;
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+}
+
+.kds-info {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.kds-count {
+    font-size: 15px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.kds-count i {
+    color: var(--primary);
+}
+
+.kds-count strong {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.kds-time {
+    font-size: 14px;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- EMPTY STATE ---- */
+.kds-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 80px 24px;
+    text-align: center;
+}
+
+.kds-empty-icon {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: hsl(142, 70%, 92%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    animation: emptyPulse 2s ease-in-out infinite;
+}
+
+.kds-empty-icon i {
+    font-size: 40px;
+    color: hsl(142, 72%, 40%);
+}
+
+@keyframes emptyPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+.kds-empty h3 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+}
+
+.kds-empty p {
+    font-size: 15px;
+    color: var(--text-muted);
+}
+
+/* ---- KDS GRID ---- */
+.kds-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 16px;
+    align-items: start;
+}
+
+/* ---- KDS CARD ---- */
+.kds-card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    border: 2px solid var(--border);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.kds-card.waiting {
+    border-top: 4px solid hsl(210, 80%, 55%);
+}
+
+.kds-card.preparing {
+    border-top: 4px solid hsl(25, 90%, 50%);
+}
+
+.kds-card.warning {
+    border-top-color: hsl(38, 92%, 50%);
+    animation: cardWarn 2s ease-in-out infinite;
+}
+
+.kds-card.urgent {
+    border-top-color: hsl(0, 72%, 55%);
+    animation: cardUrgent 1s ease-in-out infinite;
+}
+
+@keyframes cardWarn {
+    0%, 100% { box-shadow: var(--shadow); }
+    50% { box-shadow: 0 0 0 3px hsla(38, 92%, 50%, 0.2), var(--shadow); }
+}
+
+@keyframes cardUrgent {
+    0%, 100% { box-shadow: var(--shadow); }
+    50% { box-shadow: 0 0 0 4px hsla(0, 72%, 55%, 0.25), var(--shadow-md); }
+}
+
+/* ---- CARD HEADER ---- */
+.kds-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.kds-order-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.kds-order-num {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: -0.5px;
+}
+
+.kds-order-type {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-muted);
+    padding: 3px 10px;
+    background: hsl(220, 20%, 96%);
+    border-radius: 6px;
+}
+
+/* ---- TIMER ---- */
+.kds-timer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: hsl(142, 72%, 35%);
+    background: hsl(142, 70%, 93%);
+}
+
+.kds-timer i {
+    font-size: 13px;
+}
+
+.kds-timer.warning {
+    color: hsl(38, 92%, 35%);
+    background: hsl(38, 92%, 90%);
+}
+
+.kds-timer.urgent {
+    color: hsl(0, 72%, 40%);
+    background: hsl(0, 70%, 92%);
+    animation: timerPulse 1s ease-in-out infinite;
+}
+
+@keyframes timerPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* ---- PROGRESS BAR ---- */
+.kds-progress {
+    position: relative;
+    height: 28px;
+    background: hsl(220, 20%, 95%);
+    overflow: hidden;
+}
+
+.kds-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, hsl(142, 72%, 50%), hsl(142, 72%, 40%));
+    border-radius: 0;
+    transition: width 0.5s ease;
+    position: relative;
+}
+
+.kds-progress-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.kds-progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--text);
+    text-shadow: 0 0 4px rgba(255,255,255,0.8);
+    z-index: 1;
+}
+
+/* ---- ITEMS LIST ---- */
+.kds-items {
+    padding: 8px 0;
+}
+
+.kds-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 10px 16px;
+    transition: all 0.3s ease;
+    border-bottom: 1px solid hsl(220, 20%, 96%);
+}
+
+.kds-item:last-child {
+    border-bottom: none;
+}
+
+.kds-item.done {
+    opacity: 0.5;
+    background: hsl(142, 70%, 97%);
+}
+
+.kds-item.done .kds-item-name {
+    text-decoration: line-through;
+}
+
+.kds-item-left {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    flex: 1;
+}
+
+/* ---- CHECK BUTTON ---- */
+.kds-check {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2.5px solid hsl(220, 15%, 75%);
+    background: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    font-size: 13px;
+    color: hsl(220, 15%, 70%);
+    margin-top: 2px;
+}
+
+.kds-check:hover {
+    border-color: hsl(142, 72%, 45%);
+    color: hsl(142, 72%, 45%);
+    background: hsl(142, 70%, 95%);
+    transform: scale(1.1);
+}
+
+.kds-check.checked {
+    border-color: hsl(142, 72%, 45%);
+    background: hsl(142, 72%, 45%);
+    color: #fff;
+}
+
+.kds-check.checked:hover {
+    background: hsl(38, 92%, 50%);
+    border-color: hsl(38, 92%, 50%);
+    color: #fff;
+}
+
+.kds-bullet {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: hsl(210, 80%, 55%);
+    flex-shrink: 0;
+    margin-top: 8px;
+}
+
+/* ---- ITEM INFO ---- */
+.kds-item-info {
+    flex: 1;
+}
+
+.kds-item-main {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.kds-item-qty {
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--primary);
+    min-width: 28px;
+}
+
+.kds-item-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    transition: all 0.3s ease;
+}
+
+.kds-item-toppings {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.kds-item-toppings span {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    padding: 2px 8px;
+    background: hsl(220, 20%, 96%);
+    border-radius: 4px;
+}
+
+.kds-item-note {
+    font-size: 12px;
+    color: hsl(25, 90%, 45%);
+    margin-top: 4px;
+    font-weight: 500;
+    font-style: italic;
+}
+
+.kds-item-note i {
+    font-size: 10px;
+    margin-right: 2px;
+}
+
+/* ---- CARD ACTIONS ---- */
+.kds-card-actions {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    background: hsl(220, 20%, 98%);
+}
+
+.kds-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 700;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.kds-btn.start {
+    background: hsl(210, 80%, 55%);
+    color: #fff;
+}
+
+.kds-btn.start:hover {
+    background: hsl(210, 80%, 45%);
+    box-shadow: 0 4px 12px hsla(210, 80%, 55%, 0.3);
+    transform: translateY(-1px);
+}
+
+.kds-btn.done {
+    background: hsl(142, 72%, 45%);
+    color: #fff;
+}
+
+.kds-btn.done:hover {
+    background: hsl(142, 72%, 38%);
+    box-shadow: 0 4px 12px hsla(142, 72%, 45%, 0.3);
+    transform: translateY(-1px);
+}
+
+.kds-btn.done.pulse {
+    animation: btnPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes btnPulse {
+    0%, 100% { box-shadow: 0 0 0 0 hsla(142, 72%, 45%, 0.4); }
+    50% { box-shadow: 0 0 0 8px hsla(142, 72%, 45%, 0); }
+}
+
+/* ---- RESPONSIVE ---- */
+@media (max-width: 768px) {
+    .kds-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .kds-header {
+        flex-direction: column;
+        gap: 12px;
+        align-items: flex-start;
+    }
+
+    .kds-order-num {
+        font-size: 20px;
+    }
+}
