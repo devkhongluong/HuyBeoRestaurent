@@ -1,3 +1,4 @@
+@using System.Security.Claims
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -11,6 +12,20 @@
     <link rel="stylesheet" href="~/css/admin.css" asp-append-version="true" />
 </head>
 <body>
+    @{
+        var userName = User.Identity?.Name ?? "Quản lý";
+        var userRole = User.FindFirst(ClaimTypes.Role)?.Value ?? "Admin";
+        var userInitial = userName.Length > 0 ? userName[0].ToString().ToUpper() : "Q";
+        var roleDisplay = userRole switch
+        {
+            "Admin" => "Quản trị viên",
+            "QuanLy" => "Quản lý",
+            "ThuNgan" => "Thu ngân",
+            "Bep" => "Nhân viên bếp",
+            _ => userRole
+        };
+    }
+
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-header">
@@ -45,6 +60,14 @@
             </a>
 
             <div class="nav-section-label">Vận hành</div>
+            <a href="/Pos" class="nav-item @(ViewData["ActiveMenu"]?.ToString() == "pos" ? "active" : "")">
+                <i class="fas fa-cash-register nav-icon"></i>
+                <span>POS Thu ngân</span>
+            </a>
+            <a href="/Bep" class="nav-item @(ViewData["ActiveMenu"]?.ToString() == "bep" ? "active" : "")">
+                <i class="fas fa-fire-burner nav-icon"></i>
+                <span>Bếp (KDS)</span>
+            </a>
             <a href="/Admin/DonHang" class="nav-item @(ViewData["ActiveMenu"]?.ToString() == "donhang" ? "active" : "")">
                 <i class="fas fa-receipt nav-icon"></i>
                 <span>Đơn hàng</span>
@@ -63,18 +86,25 @@
                 <i class="fas fa-qrcode nav-icon"></i>
                 <span>Mã QR</span>
             </a>
+            <a href="/Auth/DoiMatKhau" class="nav-item @(ViewData["ActiveMenu"]?.ToString() == "doimatkhau" ? "active" : "")">
+                <i class="fas fa-key nav-icon"></i>
+                <span>Đổi mật khẩu</span>
+            </a>
         </nav>
 
         <div class="sidebar-footer">
             <div class="user-info">
-                <div class="user-avatar">Q</div>
+                <div class="user-avatar">@userInitial</div>
                 <div class="user-details">
-                    <span class="user-name">Quản lý</span>
-                    <span class="user-role">Admin</span>
+                    <span class="user-name">@userName</span>
+                    <span class="user-role">@roleDisplay</span>
                 </div>
-                <a href="/Auth/Logout" class="logout-btn" title="Đăng xuất">
-                    <i class="fas fa-sign-out-alt"></i>
-                </a>
+                <form method="post" asp-controller="Auth" asp-action="Logout" style="margin:0;">
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="logout-btn" title="Đăng xuất">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </form>
             </div>
         </div>
     </aside>

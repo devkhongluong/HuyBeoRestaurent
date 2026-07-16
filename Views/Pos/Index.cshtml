@@ -1,0 +1,406 @@
+@model List<webHuyBeo.Models.DonHang>
+@{
+    Layout = "~/Views/Shared/_AdminLayout.cshtml";
+    ViewData["Title"] = "POS Thu ngân";
+    ViewData["ActiveMenu"] = "pos";
+}
+
+<link rel="stylesheet" href="~/css/pos-page.css" asp-append-version="true" />
+
+<!-- Stats Bar -->
+<div class="pos-stats">
+    <div class="pos-stat-item revenue">
+        <i class="fas fa-coins"></i>
+        <div>
+            <span class="stat-val">@(((decimal)ViewBag.DoanhThuHomNay).ToString("N0"))đ</span>
+            <span class="stat-lbl">Doanh thu hôm nay</span>
+        </div>
+    </div>
+    <div class="pos-stat-item pending">
+        <i class="fas fa-clock"></i>
+        <div>
+            <span class="stat-val">@ViewBag.CountCho</span>
+            <span class="stat-lbl">Chờ xác nhận</span>
+        </div>
+    </div>
+    <div class="pos-stat-item confirmed">
+        <i class="fas fa-check"></i>
+        <div>
+            <span class="stat-val">@ViewBag.CountXacNhan</span>
+            <span class="stat-lbl">Đã xác nhận</span>
+        </div>
+    </div>
+    <div class="pos-stat-item cooking">
+        <i class="fas fa-fire"></i>
+        <div>
+            <span class="stat-val">@ViewBag.CountDangLam</span>
+            <span class="stat-lbl">Đang chế biến</span>
+        </div>
+    </div>
+    <div class="pos-stat-item ready">
+        <i class="fas fa-bell"></i>
+        <div>
+            <span class="stat-val">@ViewBag.CountSanSang</span>
+            <span class="stat-lbl">Sẵn sàng</span>
+        </div>
+    </div>
+</div>
+
+<!-- Filter Tabs -->
+<div class="pos-tabs">
+    <a href="/Pos" class="pos-tab @(ViewBag.TrangThai == null ? "active" : "")">
+        <i class="fas fa-list"></i> Tất cả đang xử lý
+    </a>
+    <a href="/Pos?trangThai=ChoXacNhan" class="pos-tab @(ViewBag.TrangThai == "ChoXacNhan" ? "active" : "")">
+        <i class="fas fa-clock"></i> Chờ xác nhận
+        @if ((int)ViewBag.CountCho > 0)
+        {
+            <span class="tab-badge pulse">@ViewBag.CountCho</span>
+        }
+    </a>
+    <a href="/Pos?trangThai=DaXacNhan" class="pos-tab @(ViewBag.TrangThai == "DaXacNhan" ? "active" : "")">
+        <i class="fas fa-check-circle"></i> Đã xác nhận
+    </a>
+    <a href="/Pos?trangThai=DangCheBien" class="pos-tab @(ViewBag.TrangThai == "DangCheBien" ? "active" : "")">
+        <i class="fas fa-fire"></i> Đang làm
+    </a>
+    <a href="/Pos?trangThai=SanSangPhucVu" class="pos-tab @(ViewBag.TrangThai == "SanSangPhucVu" ? "active" : "")">
+        <i class="fas fa-bell"></i> Sẵn sàng
+    </a>
+    <a href="/Pos?trangThai=DaHoanThanh" class="pos-tab @(ViewBag.TrangThai == "DaHoanThanh" ? "active" : "")">
+        <i class="fas fa-check-double"></i> Hoàn thành
+    </a>
+</div>
+
+<!-- Orders Grid -->
+@if (Model.Count == 0)
+{
+    <div class="empty-state">
+        <i class="fas fa-inbox"></i>
+        <p>Không có đơn hàng nào</p>
+    </div>
+}
+else
+{
+    <div class="pos-grid">
+        @foreach (var don in Model)
+        {
+            var statusClass = don.TrangThai switch
+            {
+                "ChoXacNhan" => "status-pending",
+                "DaXacNhan" => "status-confirmed",
+                "DangCheBien" => "status-cooking",
+                "SanSangPhucVu" => "status-ready",
+                "DaHoanThanh" => "status-done",
+                _ => ""
+            };
+            var statusText = don.TrangThai switch
+            {
+                "ChoXacNhan" => "Chờ xác nhận",
+                "DaXacNhan" => "Đã xác nhận",
+                "DangCheBien" => "Đang chế biến",
+                "SanSangPhucVu" => "Sẵn sàng phục vụ",
+                "DaHoanThanh" => "Hoàn thành",
+                _ => don.TrangThai
+            };
+            var payClass = don.TrangThaiTT == "DaThanhToan" ? "pay-done" : "pay-pending";
+            var payText = don.TrangThaiTT == "DaThanhToan" ? "Đã TT" : "Chưa TT";
+            var timeAgo = (DateTime.Now - don.NgayTao);
+            var timeStr = timeAgo.TotalMinutes < 60
+                ? $"{(int)timeAgo.TotalMinutes} phút"
+                : $"{(int)timeAgo.TotalHours}h{timeAgo.Minutes}p";
+
+            <div class="pos-card @statusClass" data-id="@don.DonHangID" onclick="openDetail(@don.DonHangID)">
+                <div class="pos-card-header">
+                    <div class="order-number">#@don.SoThuTu</div>
+                    <div class="order-badges">
+                        <span class="order-type">@(don.LoaiDon == "MangDi" ? "Mang đi" : "Tại chỗ")</span>
+                        <span class="order-pay @payClass">@payText</span>
+                    </div>
+                </div>
+
+                <div class="pos-card-body">
+                    <div class="order-items-preview">
+                        @foreach (var ct in don.ChiTietDons.Take(4))
+                        {
+                            <div class="item-line">
+                                <span class="item-qty">@(ct.SoLuong)x</span>
+                                <span class="item-name">@ct.MonAn.TenMon</span>
+                            </div>
+                        }
+                        @if (don.ChiTietDons.Count > 4)
+                        {
+                            <div class="item-line more">+@(don.ChiTietDons.Count - 4) món khác...</div>
+                        }
+                    </div>
+                </div>
+
+                <div class="pos-card-footer">
+                    <div class="order-meta">
+                        <span class="order-time"><i class="far fa-clock"></i> @timeStr</span>
+                        <span class="order-status @statusClass">@statusText</span>
+                    </div>
+                    <div class="order-total">@don.ThanhTien.ToString("N0")đ</div>
+                </div>
+
+                @if (don.TrangThai == "ChoXacNhan")
+                {
+                    <div class="pos-card-actions" onclick="event.stopPropagation()">
+                        <button class="pos-btn confirm" onclick="xacNhanDon(@don.DonHangID)">
+                            <i class="fas fa-check"></i> Xác nhận
+                        </button>
+                        <button class="pos-btn cancel" onclick="showHuyModal(@don.DonHangID, '@don.SoThuTu')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                }
+                else if (don.TrangThai == "SanSangPhucVu" && don.TrangThaiTT == "ChuaThanhToan")
+                {
+                    <div class="pos-card-actions" onclick="event.stopPropagation()">
+                        <button class="pos-btn pay" onclick="showThuTienModal(@don.DonHangID, '@don.SoThuTu', @don.ThanhTien)">
+                            <i class="fas fa-money-bill-wave"></i> Thu tiền
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+<!-- Order Detail Modal -->
+<div class="modal-overlay" id="detailModal">
+    <div class="modal" style="max-width: 600px;">
+        <div class="modal-header">
+            <span class="modal-title" id="detailTitle">Chi tiết đơn hàng</span>
+            <button class="modal-close" onclick="closeModal('detailModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body" id="detailBody">
+            <div style="text-align:center; padding:40px; color:var(--text-muted);">
+                <i class="fas fa-spinner fa-spin" style="font-size:24px;"></i>
+            </div>
+        </div>
+        <div class="modal-footer" id="detailFooter"></div>
+    </div>
+</div>
+
+<!-- Cancel Modal -->
+<div class="modal-overlay" id="huyModal">
+    <div class="modal" style="max-width: 440px;">
+        <div class="modal-header">
+            <span class="modal-title">Hủy đơn <span id="huyDonStt"></span></span>
+            <button class="modal-close" onclick="closeModal('huyModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="huyDonId" />
+            <div class="form-group">
+                <label class="form-label">Lý do hủy</label>
+                <textarea id="huyLyDo" class="form-control" rows="3" placeholder="Nhập lý do hủy đơn..."></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('huyModal')">Hủy bỏ</button>
+            <button class="btn btn-danger" onclick="huyDon()"><i class="fas fa-trash"></i> Xác nhận hủy</button>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Modal -->
+<div class="modal-overlay" id="thuTienModal">
+    <div class="modal" style="max-width: 440px;">
+        <div class="modal-header">
+            <span class="modal-title">Thu tiền đơn <span id="ttDonStt"></span></span>
+            <button class="modal-close" onclick="closeModal('thuTienModal')"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="ttDonId" />
+            <div class="payment-amount" id="ttAmount">0đ</div>
+            <div class="payment-methods">
+                <label class="payment-option">
+                    <input type="radio" name="phuongThuc" value="TienMat" checked />
+                    <div class="payment-card">
+                        <i class="fas fa-money-bill-wave"></i>
+                        <span>Tiền mặt</span>
+                    </div>
+                </label>
+                <label class="payment-option">
+                    <input type="radio" name="phuongThuc" value="ChuyenKhoan" />
+                    <div class="payment-card">
+                        <i class="fas fa-university"></i>
+                        <span>Chuyển khoản</span>
+                    </div>
+                </label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('thuTienModal')">Hủy bỏ</button>
+            <button class="btn btn-primary" onclick="thuTien()"><i class="fas fa-check"></i> Xác nhận thanh toán</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function openModal(id) { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+    // View detail
+    async function openDetail(donId) {
+        openModal('detailModal');
+        document.getElementById('detailBody').innerHTML = '<div style="text-align:center;padding:40px;"><i class="fas fa-spinner fa-spin" style="font-size:24px;color:var(--text-muted);"></i></div>';
+        document.getElementById('detailFooter').innerHTML = '';
+
+        const res = await fetch(`/Pos/ChiTiet/${donId}`);
+        const data = await res.json();
+
+        document.getElementById('detailTitle').textContent = `Đơn #${data.soThuTu}`;
+
+        let statusBadge = getStatusBadge(data.trangThai);
+        let payBadge = data.trangThaiTT === 'DaThanhToan'
+            ? '<span class="badge badge-success"><i class="fas fa-check"></i> Đã thanh toán</span>'
+            : '<span class="badge badge-warning"><i class="fas fa-clock"></i> Chưa thanh toán</span>';
+
+        let html = `
+            <div class="detail-badges">${statusBadge} ${payBadge}
+                <span class="badge badge-info">${data.loaiDon === 'MangDi' ? 'Mang đi' : 'Tại chỗ'}</span>
+            </div>
+            <div class="detail-time"><i class="far fa-clock"></i> ${data.ngayTao}</div>
+            <div class="detail-items">
+                <div class="detail-items-title">Danh sách món</div>`;
+
+        data.chiTiets.forEach(ct => {
+            let toppingStr = ct.toppings && ct.toppings.length > 0
+                ? '<div class="ct-toppings">' + ct.toppings.map(t => `+ ${t.ten}`).join(', ') + '</div>'
+                : '';
+            html += `
+                <div class="detail-item">
+                    <div class="di-left">
+                        <span class="di-qty">${ct.soLuong}x</span>
+                        <div>
+                            <span class="di-name">${ct.tenMon}</span>
+                            ${toppingStr}
+                            ${ct.ghiChu ? `<div class="di-note"><i class="fas fa-pen"></i> ${ct.ghiChu}</div>` : ''}
+                        </div>
+                    </div>
+                    <span class="di-price">${Number(ct.thanhTien).toLocaleString('vi-VN')}đ</span>
+                </div>`;
+        });
+
+        html += '</div>';
+
+        // Totals
+        html += `<div class="detail-totals">
+            <div class="dt-row"><span>Tổng cộng</span><span>${Number(data.tongTien).toLocaleString('vi-VN')}đ</span></div>`;
+        if (data.tongGiamGia && data.tongGiamGia > 0) {
+            html += `<div class="dt-row discount"><span>Giảm giá</span><span>-${Number(data.tongGiamGia).toLocaleString('vi-VN')}đ</span></div>`;
+        }
+        html += `<div class="dt-row total"><span>Thành tiền</span><span>${Number(data.thanhTien).toLocaleString('vi-VN')}đ</span></div>
+        </div>`;
+
+        // Activity log
+        if (data.nhatKys && data.nhatKys.length > 0) {
+            html += '<div class="detail-log"><div class="detail-items-title">Nhật ký</div>';
+            data.nhatKys.forEach(n => {
+                html += `<div class="log-entry"><span class="log-action">${n.hanhDong}</span><span class="log-meta">${n.nguoi} · ${n.thoiGian}</span></div>`;
+            });
+            html += '</div>';
+        }
+
+        document.getElementById('detailBody').innerHTML = html;
+
+        // Footer actions
+        let footer = '';
+        if (data.trangThai === 'ChoXacNhan') {
+            footer = `<button class="btn btn-primary" onclick="xacNhanDon(${data.donHangId})"><i class="fas fa-check"></i> Xác nhận đơn</button>`;
+        } else if (data.trangThai === 'DaXacNhan') {
+            footer = `<button class="btn btn-primary" onclick="chuyenTrangThai(${data.donHangId},'DangCheBien')"><i class="fas fa-fire"></i> Chuyển sang Đang chế biến</button>`;
+        } else if (data.trangThai === 'DangCheBien') {
+            footer = `<button class="btn btn-primary" onclick="chuyenTrangThai(${data.donHangId},'SanSangPhucVu')"><i class="fas fa-bell"></i> Sẵn sàng phục vụ</button>`;
+        } else if (data.trangThai === 'SanSangPhucVu') {
+            footer = `<button class="btn btn-primary" onclick="chuyenTrangThai(${data.donHangId},'DaHoanThanh')"><i class="fas fa-check-double"></i> Hoàn thành</button>`;
+        }
+        if (data.trangThaiTT === 'ChuaThanhToan' && data.trangThai !== 'Huy') {
+            footer += `<button class="btn btn-outline" onclick="closeModal('detailModal');showThuTienModal(${data.donHangId},'${data.soThuTu}',${data.thanhTien})"><i class="fas fa-money-bill-wave"></i> Thu tiền</button>`;
+        }
+        footer += `<a href="/Pos/InBill/${data.donHangId}" target="_blank" class="btn btn-outline"><i class="fas fa-print"></i> In bill</a>`;
+        document.getElementById('detailFooter').innerHTML = footer;
+    }
+
+    function getStatusBadge(tt) {
+        const map = {
+            'ChoXacNhan': ['badge-warning', 'Chờ xác nhận'],
+            'DaXacNhan': ['badge-info', 'Đã xác nhận'],
+            'DangCheBien': ['badge-warning', 'Đang chế biến'],
+            'SanSangPhucVu': ['badge-success', 'Sẵn sàng'],
+            'DaHoanThanh': ['badge-success', 'Hoàn thành'],
+            'Huy': ['badge-danger', 'Đã hủy']
+        };
+        const [cls, text] = map[tt] || ['badge-info', tt];
+        return `<span class="badge ${cls}">${text}</span>`;
+    }
+
+    // Confirm order
+    async function xacNhanDon(id) {
+        const res = await fetch(`/Pos/XacNhan/${id}`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) location.reload();
+        else alert(data.message);
+    }
+
+    // Change status
+    async function chuyenTrangThai(id, tt) {
+        const res = await fetch('/Pos/ChuyenTrangThai', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `id=${id}&trangThaiMoi=${tt}`
+        });
+        const data = await res.json();
+        if (data.success) location.reload();
+        else alert(data.message);
+    }
+
+    // Cancel order
+    function showHuyModal(id, stt) {
+        document.getElementById('huyDonId').value = id;
+        document.getElementById('huyDonStt').textContent = '#' + stt;
+        document.getElementById('huyLyDo').value = '';
+        openModal('huyModal');
+    }
+
+    async function huyDon() {
+        const id = document.getElementById('huyDonId').value;
+        const lyDo = document.getElementById('huyLyDo').value;
+        const res = await fetch('/Pos/HuyDon', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `id=${id}&lyDo=${encodeURIComponent(lyDo)}`
+        });
+        const data = await res.json();
+        if (data.success) location.reload();
+        else alert(data.message);
+    }
+
+    // Payment
+    function showThuTienModal(id, stt, amount) {
+        document.getElementById('ttDonId').value = id;
+        document.getElementById('ttDonStt').textContent = '#' + stt;
+        document.getElementById('ttAmount').textContent = Number(amount).toLocaleString('vi-VN') + 'đ';
+        openModal('thuTienModal');
+    }
+
+    async function thuTien() {
+        const id = document.getElementById('ttDonId').value;
+        const pt = document.querySelector('input[name="phuongThuc"]:checked').value;
+        const res = await fetch('/Pos/ThuTien', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `id=${id}&phuongThuc=${pt}`
+        });
+        const data = await res.json();
+        if (data.success) location.reload();
+        else alert(data.message);
+    }
+
+    // Auto-refresh every 30 seconds
+    setInterval(() => location.reload(), 30000);
+</script>
+}

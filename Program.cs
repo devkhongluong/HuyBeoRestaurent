@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using webHuyBeo.Models;
 
@@ -9,7 +10,44 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Cookie Authentication
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Auth/Login";
+        options.LogoutPath = "/Auth/Logout";
+        options.AccessDeniedPath = "/Auth/AccessDenied";
+        options.ExpireTimeSpan = TimeSpan.FromHours(12);
+        options.SlidingExpiration = true;
+        options.Cookie.Name = "HuyBeo.Auth";
+        options.Cookie.HttpOnly = true;
+    });
+
 var app = builder.Build();
+
+// Seed default admin account
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    db.Database.Migrate(); // Ensure database is up to date
+    if (!db.NguoiDungs.Any(u => u.VaiTro == "Admin"))
+    {
+        // Hash: SHA256("admin" + "HuyBeoSalt2026")
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        var bytes = System.Text.Encoding.UTF8.GetBytes("admin" + "HuyBeoSalt2026");
+        var hash = Convert.ToBase64String(sha.ComputeHash(bytes));
+
+        db.NguoiDungs.Add(new NguoiDung
+        {
+            TenDangNhap = "admin",
+            MatKhau = hash,
+            Hoten = "Quản trị viên",
+            VaiTro = "Admin",
+            TrangThai = "DangLamViec"
+        });
+        db.SaveChanges();
+    }
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
@@ -24,6 +62,7 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(
@@ -31,3 +70,4 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();
+

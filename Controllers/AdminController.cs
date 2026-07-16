@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
@@ -5,6 +6,7 @@ using webHuyBeo.Models;
 
 namespace webHuyBeo.Controllers
 {
+    [Authorize(Roles = "Admin,QuanLy")]
     public class AdminController : Controller
     {
         private readonly ApplicationDbContext _db;

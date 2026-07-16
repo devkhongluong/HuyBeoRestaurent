@@ -1,0 +1,132 @@
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Đăng nhập - Huy Béo Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="stylesheet" href="~/css/auth.css" asp-append-version="true" />
+</head>
+<body>
+    <div class="login-container">
+        <!-- Left Panel - Branding -->
+        <div class="login-brand">
+            <div class="brand-content">
+                <div class="brand-logo-wrap">
+                    <span class="brand-emoji">🍖</span>
+                    <h1 class="brand-name">Huy Béo</h1>
+                </div>
+                <p class="brand-tagline">Hệ thống quản lý nhà hàng</p>
+                <div class="brand-features">
+                    <div class="feature-item">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Theo dõi doanh thu real-time</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-qrcode"></i>
+                        <span>Đặt món qua QR Code</span>
+                    </div>
+                    <div class="feature-item">
+                        <i class="fas fa-bell"></i>
+                        <span>Thông báo đơn hàng tức thì</span>
+                    </div>
+                </div>
+            </div>
+            <div class="brand-decor">
+                <div class="decor-circle c1"></div>
+                <div class="decor-circle c2"></div>
+                <div class="decor-circle c3"></div>
+            </div>
+        </div>
+
+        <!-- Right Panel - Login Form -->
+        <div class="login-form-panel">
+            <div class="login-form-wrap">
+                <div class="login-header">
+                    <div class="login-mobile-logo">🍖</div>
+                    <h2 class="login-title">Đăng nhập</h2>
+                    <p class="login-subtitle">Nhập thông tin tài khoản để tiếp tục</p>
+                </div>
+
+                @if (ViewBag.Error != null)
+                {
+                    <div class="login-alert error">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <span>@ViewBag.Error</span>
+                    </div>
+                }
+
+                <form method="post" asp-controller="Auth" asp-action="Login" id="loginForm">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" name="returnUrl" value="@ViewBag.ReturnUrl" />
+
+                    <div class="input-group">
+                        <label class="input-label" for="tenDangNhap">
+                            <i class="fas fa-user"></i> Tên đăng nhập
+                        </label>
+                        <div class="input-wrap">
+                            <input type="text" id="tenDangNhap" name="tenDangNhap"
+                                   class="input-field" placeholder="Nhập tên đăng nhập..."
+                                   autocomplete="username" required autofocus />
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label class="input-label" for="matKhau">
+                            <i class="fas fa-lock"></i> Mật khẩu
+                        </label>
+                        <div class="input-wrap">
+                            <input type="password" id="matKhau" name="matKhau"
+                                   class="input-field" placeholder="Nhập mật khẩu..."
+                                   autocomplete="current-password" required />
+                            <button type="button" class="toggle-password" onclick="togglePassword()">
+                                <i class="fas fa-eye" id="eyeIcon"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="login-btn" id="loginBtn">
+                        <span class="btn-text">Đăng nhập</span>
+                        <span class="btn-loader" style="display:none">
+                            <i class="fas fa-spinner fa-spin"></i>
+                        </span>
+                        <i class="fas fa-arrow-right btn-arrow"></i>
+                    </button>
+                </form>
+
+                <div class="login-footer">
+                    <p>© 2026 Huy Béo Restaurant. Đặng Trường An.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function togglePassword() {
+            const input = document.getElementById('matKhau');
+            const icon = document.getElementById('eyeIcon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('fa-eye', 'fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('fa-eye-slash', 'fa-eye');
+            }
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', function () {
+            const btn = document.getElementById('loginBtn');
+            btn.querySelector('.btn-text').style.display = 'none';
+            btn.querySelector('.btn-arrow').style.display = 'none';
+            btn.querySelector('.btn-loader').style.display = 'inline-flex';
+            btn.disabled = true;
+        });
+    </script>
+</body>
+</html>
