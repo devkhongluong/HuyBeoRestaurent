@@ -3,17 +3,40 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using webHuyBeo.Models;
+using webHuyBeo.Repositories;
 
 namespace webHuyBeo.Controllers
 {
     [Authorize(Roles = "Admin,QuanLy")]
     public class AdminController : Controller
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IRepository<MonAn> _monAnRepo;
+        private readonly IRepository<DanhMuc> _danhMucRepo;
+        private readonly IRepository<Topping> _toppingRepo;
+        private readonly IRepository<MonAnTopping> _monAnToppingRepo;
+        private readonly IRepository<DonHang> _donHangRepo;
+        private readonly IRepository<KhuyenMai> _khuyenMaiRepo;
+        private readonly IRepository<NguoiDung> _nguoiDungRepo;
+        private readonly IRepository<NhatKyDon> _nhatKyRepo;
 
-        public AdminController(ApplicationDbContext db)
+        public AdminController(
+            IRepository<MonAn> monAnRepo,
+            IRepository<DanhMuc> danhMucRepo,
+            IRepository<Topping> toppingRepo,
+            IRepository<MonAnTopping> monAnToppingRepo,
+            IRepository<DonHang> donHangRepo,
+            IRepository<KhuyenMai> khuyenMaiRepo,
+            IRepository<NguoiDung> nguoiDungRepo,
+            IRepository<NhatKyDon> nhatKyRepo)
         {
-            _db = db;
+            _monAnRepo = monAnRepo;
+            _danhMucRepo = danhMucRepo;
+            _toppingRepo = toppingRepo;
+            _monAnToppingRepo = monAnToppingRepo;
+            _donHangRepo = donHangRepo;
+            _khuyenMaiRepo = khuyenMaiRepo;
+            _nguoiDungRepo = nguoiDungRepo;
+            _nhatKyRepo = nhatKyRepo;
         }
 
         // GET: /Admin
@@ -21,10 +44,10 @@ namespace webHuyBeo.Controllers
         {
             ViewData["Title"] = "Dashboard";
             ViewData["ActiveMenu"] = "dashboard";
-            ViewBag.TotalMonAn = await _db.MonAns.CountAsync();
-            ViewBag.TotalTopping = await _db.Toppings.CountAsync();
-            ViewBag.TotalDonHang = await _db.DonHangs.CountAsync();
-            ViewBag.DoanhThuHomNay = await _db.DonHangs
+            ViewBag.TotalMonAn = await _monAnRepo.Query().CountAsync();
+            ViewBag.TotalTopping = await _toppingRepo.Query().CountAsync();
+            ViewBag.TotalDonHang = await _donHangRepo.Query().CountAsync();
+            ViewBag.DoanhThuHomNay = await _donHangRepo.Query()
                 .Where(d => d.NgayTao.Date == DateTime.Today && d.TrangThaiTT == "DaThanhToan")
                 .SumAsync(d => (decimal?)d.ThanhTien) ?? 0;
             return View();
@@ -40,7 +63,7 @@ namespace webHuyBeo.Controllers
             ViewData["Title"] = "Quản lý Món ăn";
             ViewData["ActiveMenu"] = "monan";
 
-            var query = _db.MonAns.Include(m => m.DanhMuc).AsQueryable();
+            var query = _monAnRepo.Query(includeProperties: "DanhMuc");
 
             if (!string.IsNullOrEmpty(search))
                 query = query.Where(m => m.TenMon.Contains(search));
@@ -48,7 +71,7 @@ namespace webHuyBeo.Controllers
             if (danhMucId.HasValue)
                 query = query.Where(m => m.DanhMucID == danhMucId);
 
-            ViewBag.DanhMucs = await _db.DanhMucs.OrderBy(d => d.ThuTu).ToListAsync();
+            ViewBag.DanhMucs = await _danhMucRepo.Query().OrderBy(d => d.ThuTu).ToListAsync();
             ViewBag.Search = search;
             ViewBag.DanhMucId = danhMucId;
 
@@ -61,8 +84,8 @@ namespace webHuyBeo.Controllers
         {
             ViewData["Title"] = "Thêm Món ăn mới";
             ViewData["ActiveMenu"] = "monan";
-            ViewBag.DanhMucs = new SelectList(await _db.DanhMucs.OrderBy(d => d.ThuTu).ToListAsync(), "DanhMucID", "TenDanhMuc");
-            ViewBag.Toppings = await _db.Toppings.Where(t => t.TrangThai == "ConBan").ToListAsync();
+            ViewBag.DanhMucs = new SelectList(await _danhMucRepo.Query().OrderBy(d => d.ThuTu).ToListAsync(), "DanhMucID", "TenDanhMuc");
+            ViewBag.Toppings = await _toppingRepo.Query().Where(t => t.TrangThai == "ConBan").ToListAsync();
             return View(new MonAn { ConBan = true });
         }
 
@@ -71,7 +94,6 @@ namespace webHuyBeo.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> TaoMonAn(MonAn model, int[]? toppingIds, IFormFile? hinhAnh)
         {
-            // Remove navigaton props from validation
             ModelState.Remove("DanhMuc");
             ModelState.Remove("MonAnToppings");
             ModelState.Remove("ChiTietDons");
@@ -81,12 +103,11 @@ namespace webHuyBeo.Controllers
             {
                 ViewData["Title"] = "Thêm Món ăn mới";
                 ViewData["ActiveMenu"] = "monan";
-                ViewBag.DanhMucs = new SelectList(await _db.DanhMucs.ToListAsync(), "DanhMucID", "TenDanhMuc", model.DanhMucID);
-                ViewBag.Toppings = await _db.Toppings.Where(t => t.TrangThai == "ConBan").ToListAsync();
+                ViewBag.DanhMucs = new SelectList(await _danhMucRepo.GetAllAsync(), "DanhMucID", "TenDanhMuc", model.DanhMucID);
+                ViewBag.Toppings = await _toppingRepo.Query().Where(t => t.TrangThai == "ConBan").ToListAsync();
                 return View(model);
             }
 
-            // Handle image upload
             if (hinhAnh != null && hinhAnh.Length > 0)
             {
                 var fileName = Guid.NewGuid().ToString() + Path.GetExtension(hinhAnh.FileName);
@@ -98,17 +119,16 @@ namespace webHuyBeo.Controllers
                 model.HinhAnh = "/uploads/monan/" + fileName;
             }
 
-            _db.MonAns.Add(model);
-            await _db.SaveChangesAsync();
+            await _monAnRepo.AddAsync(model);
+            await _monAnRepo.SaveAsync();
 
-            // Assign toppings
             if (toppingIds != null && toppingIds.Length > 0)
             {
                 foreach (var toppingId in toppingIds)
                 {
-                    _db.MonAnToppings.Add(new MonAnTopping { MonAnID = model.MonAnID, ToppingID = toppingId });
+                    await _monAnToppingRepo.AddAsync(new MonAnTopping { MonAnID = model.MonAnID, ToppingID = toppingId });
                 }
-                await _db.SaveChangesAsync();
+                await _monAnToppingRepo.SaveAsync();
             }
 
             TempData["Success"] = $"Đã thêm món \"{model.TenMon}\" thành công!";
@@ -120,11 +140,11 @@ namespace webHuyBeo.Controllers
         {
             ViewData["Title"] = "Chỉnh sửa Món ăn";
             ViewData["ActiveMenu"] = "monan";
-            var monAn = await _db.MonAns.Include(m => m.MonAnToppings).FirstOrDefaultAsync(m => m.MonAnID == id);
+            var monAn = await _monAnRepo.GetFirstOrDefaultAsync(m => m.MonAnID == id, includeProperties: "MonAnToppings");
             if (monAn == null) return NotFound();
 
-            ViewBag.DanhMucs = new SelectList(await _db.DanhMucs.OrderBy(d => d.ThuTu).ToListAsync(), "DanhMucID", "TenDanhMuc", monAn.DanhMucID);
-            ViewBag.Toppings = await _db.Toppings.ToListAsync();
+            ViewBag.DanhMucs = new SelectList(await _danhMucRepo.Query().OrderBy(d => d.ThuTu).ToListAsync(), "DanhMucID", "TenDanhMuc", monAn.DanhMucID);
+            ViewBag.Toppings = await _toppingRepo.GetAllAsync();
             ViewBag.SelectedToppings = monAn.MonAnToppings.Select(t => t.ToppingID).ToList();
             return View(monAn);
         }
@@ -143,16 +163,15 @@ namespace webHuyBeo.Controllers
             {
                 ViewData["Title"] = "Chỉnh sửa Món ăn";
                 ViewData["ActiveMenu"] = "monan";
-                ViewBag.DanhMucs = new SelectList(await _db.DanhMucs.ToListAsync(), "DanhMucID", "TenDanhMuc", model.DanhMucID);
-                ViewBag.Toppings = await _db.Toppings.ToListAsync();
+                ViewBag.DanhMucs = new SelectList(await _danhMucRepo.GetAllAsync(), "DanhMucID", "TenDanhMuc", model.DanhMucID);
+                ViewBag.Toppings = await _toppingRepo.GetAllAsync();
                 ViewBag.SelectedToppings = toppingIds?.ToList() ?? new List<int>();
                 return View(model);
             }
 
-            var existing = await _db.MonAns.Include(m => m.MonAnToppings).FirstOrDefaultAsync(m => m.MonAnID == id);
+            var existing = await _monAnRepo.GetFirstOrDefaultAsync(m => m.MonAnID == id, includeProperties: "MonAnToppings");
             if (existing == null) return NotFound();
 
-            // Handle image
             if (hinhAnh != null && hinhAnh.Length > 0)
             {
                 var fileName = Guid.NewGuid().ToString() + Path.GetExtension(hinhAnh.FileName);
@@ -171,15 +190,15 @@ namespace webHuyBeo.Controllers
             existing.GiaVon = model.GiaVon;
             existing.ConBan = model.ConBan;
 
-            // Update toppings
-            _db.MonAnToppings.RemoveRange(existing.MonAnToppings);
+            _monAnToppingRepo.RemoveRange(existing.MonAnToppings);
             if (toppingIds != null)
             {
                 foreach (var toppingId in toppingIds)
-                    _db.MonAnToppings.Add(new MonAnTopping { MonAnID = id, ToppingID = toppingId });
+                    await _monAnToppingRepo.AddAsync(new MonAnTopping { MonAnID = id, ToppingID = toppingId });
             }
 
-            await _db.SaveChangesAsync();
+            _monAnRepo.Update(existing);
+            await _monAnRepo.SaveAsync();
             TempData["Success"] = $"Đã cập nhật món \"{existing.TenMon}\" thành công!";
             return RedirectToAction(nameof(MonAn));
         }
@@ -189,11 +208,11 @@ namespace webHuyBeo.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> XoaMonAn(int id)
         {
-            var monAn = await _db.MonAns.FindAsync(id);
+            var monAn = await _monAnRepo.GetFirstOrDefaultAsync(m => m.MonAnID == id);
             if (monAn != null)
             {
-                _db.MonAns.Remove(monAn);
-                await _db.SaveChangesAsync();
+                _monAnRepo.Remove(monAn);
+                await _monAnRepo.SaveAsync();
                 TempData["Success"] = $"Đã xóa món \"{monAn.TenMon}\".";
             }
             return RedirectToAction(nameof(MonAn));
@@ -203,11 +222,12 @@ namespace webHuyBeo.Controllers
         [HttpPost]
         public async Task<IActionResult> ToggleMonAn(int id)
         {
-            var monAn = await _db.MonAns.FindAsync(id);
+            var monAn = await _monAnRepo.GetFirstOrDefaultAsync(m => m.MonAnID == id);
             if (monAn != null)
             {
                 monAn.ConBan = !monAn.ConBan;
-                await _db.SaveChangesAsync();
+                _monAnRepo.Update(monAn);
+                await _monAnRepo.SaveAsync();
                 return Json(new { success = true, conBan = monAn.ConBan });
             }
             return Json(new { success = false });
@@ -222,7 +242,7 @@ namespace webHuyBeo.Controllers
         {
             ViewData["Title"] = "Quản lý Danh mục";
             ViewData["ActiveMenu"] = "danhmuc";
-            var danhMucs = await _db.DanhMucs.OrderBy(d => d.ThuTu).ToListAsync();
+            var danhMucs = await _danhMucRepo.Query().OrderBy(d => d.ThuTu).ToListAsync();
             return View(danhMucs);
         }
 
@@ -234,8 +254,8 @@ namespace webHuyBeo.Controllers
             ModelState.Remove("MonAns");
             if (ModelState.IsValid)
             {
-                _db.DanhMucs.Add(model);
-                await _db.SaveChangesAsync();
+                await _danhMucRepo.AddAsync(model);
+                await _danhMucRepo.SaveAsync();
                 TempData["Success"] = $"Đã thêm danh mục \"{model.TenDanhMuc}\"!";
             }
             return RedirectToAction(nameof(DanhMuc));
@@ -247,13 +267,14 @@ namespace webHuyBeo.Controllers
         public async Task<IActionResult> SuaDanhMuc(DanhMuc model)
         {
             ModelState.Remove("MonAns");
-            var existing = await _db.DanhMucs.FindAsync(model.DanhMucID);
+            var existing = await _danhMucRepo.GetFirstOrDefaultAsync(d => d.DanhMucID == model.DanhMucID);
             if (existing != null && ModelState.IsValid)
             {
                 existing.TenDanhMuc = model.TenDanhMuc;
                 existing.MoTa = model.MoTa;
                 existing.ThuTu = model.ThuTu;
-                await _db.SaveChangesAsync();
+                _danhMucRepo.Update(existing);
+                await _danhMucRepo.SaveAsync();
                 TempData["Success"] = "Đã cập nhật danh mục!";
             }
             return RedirectToAction(nameof(DanhMuc));
@@ -264,11 +285,11 @@ namespace webHuyBeo.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> XoaDanhMuc(int id)
         {
-            var dm = await _db.DanhMucs.FindAsync(id);
+            var dm = await _danhMucRepo.GetFirstOrDefaultAsync(d => d.DanhMucID == id);
             if (dm != null)
             {
-                _db.DanhMucs.Remove(dm);
-                await _db.SaveChangesAsync();
+                _danhMucRepo.Remove(dm);
+                await _danhMucRepo.SaveAsync();
                 TempData["Success"] = $"Đã xóa danh mục \"{dm.TenDanhMuc}\".";
             }
             return RedirectToAction(nameof(DanhMuc));
@@ -283,7 +304,7 @@ namespace webHuyBeo.Controllers
         {
             ViewData["Title"] = "Quản lý Topping";
             ViewData["ActiveMenu"] = "topping";
-            var toppings = await _db.Toppings.ToListAsync();
+            var toppings = await _toppingRepo.GetAllAsync();
             return View(toppings);
         }
 
@@ -296,8 +317,8 @@ namespace webHuyBeo.Controllers
             ModelState.Remove("ChiTietToppings");
             if (ModelState.IsValid)
             {
-                _db.Toppings.Add(model);
-                await _db.SaveChangesAsync();
+                await _toppingRepo.AddAsync(model);
+                await _toppingRepo.SaveAsync();
                 TempData["Success"] = $"Đã thêm topping \"{model.TenTopping}\"!";
             }
             return RedirectToAction(nameof(Topping));
@@ -310,13 +331,14 @@ namespace webHuyBeo.Controllers
         {
             ModelState.Remove("MonAnToppings");
             ModelState.Remove("ChiTietToppings");
-            var existing = await _db.Toppings.FindAsync(model.ToppingID);
+            var existing = await _toppingRepo.GetFirstOrDefaultAsync(t => t.ToppingID == model.ToppingID);
             if (existing != null && ModelState.IsValid)
             {
                 existing.TenTopping = model.TenTopping;
                 existing.GiaThem = model.GiaThem;
                 existing.TrangThai = model.TrangThai;
-                await _db.SaveChangesAsync();
+                _toppingRepo.Update(existing);
+                await _toppingRepo.SaveAsync();
                 TempData["Success"] = "Đã cập nhật topping!";
             }
             return RedirectToAction(nameof(Topping));
@@ -327,11 +349,11 @@ namespace webHuyBeo.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> XoaTopping(int id)
         {
-            var topping = await _db.Toppings.FindAsync(id);
+            var topping = await _toppingRepo.GetFirstOrDefaultAsync(t => t.ToppingID == id);
             if (topping != null)
             {
-                _db.Toppings.Remove(topping);
-                await _db.SaveChangesAsync();
+                _toppingRepo.Remove(topping);
+                await _toppingRepo.SaveAsync();
                 TempData["Success"] = $"Đã xóa topping \"{topping.TenTopping}\".";
             }
             return RedirectToAction(nameof(Topping));
@@ -345,7 +367,7 @@ namespace webHuyBeo.Controllers
         {
             ViewData["Title"] = "Quản lý Khuyến mãi";
             ViewData["ActiveMenu"] = "khuyenmai";
-            var list = await _db.KhuyenMais.OrderByDescending(k => k.KhuyenMaiID).ToListAsync();
+            var list = await _khuyenMaiRepo.Query().OrderByDescending(k => k.KhuyenMaiID).ToListAsync();
             return View(list);
         }
 
@@ -357,8 +379,8 @@ namespace webHuyBeo.Controllers
             if (ModelState.IsValid)
             {
                 model.SoLuongDaDung = 0;
-                _db.KhuyenMais.Add(model);
-                await _db.SaveChangesAsync();
+                await _khuyenMaiRepo.AddAsync(model);
+                await _khuyenMaiRepo.SaveAsync();
                 TempData["Success"] = $"Đã tạo khuyến mãi \"{model.MaCode}\"!";
             }
             else
@@ -373,7 +395,7 @@ namespace webHuyBeo.Controllers
         public async Task<IActionResult> SuaKhuyenMai(KhuyenMai model)
         {
             ModelState.Remove("DonHangKhuyenMais");
-            var existing = await _db.KhuyenMais.FindAsync(model.KhuyenMaiID);
+            var existing = await _khuyenMaiRepo.GetFirstOrDefaultAsync(k => k.KhuyenMaiID == model.KhuyenMaiID);
             if (existing != null && ModelState.IsValid)
             {
                 existing.MaCode = model.MaCode;
@@ -386,7 +408,8 @@ namespace webHuyBeo.Controllers
                 existing.NgayBatDau = model.NgayBatDau;
                 existing.NgayKetThuc = model.NgayKetThuc;
                 existing.TrangThai = model.TrangThai;
-                await _db.SaveChangesAsync();
+                _khuyenMaiRepo.Update(existing);
+                await _khuyenMaiRepo.SaveAsync();
                 TempData["Success"] = "Đã cập nhật khuyến mãi!";
             }
             return RedirectToAction(nameof(KhuyenMai));
@@ -396,11 +419,11 @@ namespace webHuyBeo.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> XoaKhuyenMai(int id)
         {
-            var km = await _db.KhuyenMais.FindAsync(id);
+            var km = await _khuyenMaiRepo.GetFirstOrDefaultAsync(k => k.KhuyenMaiID == id);
             if (km != null)
             {
-                _db.KhuyenMais.Remove(km);
-                await _db.SaveChangesAsync();
+                _khuyenMaiRepo.Remove(km);
+                await _khuyenMaiRepo.SaveAsync();
                 TempData["Success"] = $"Đã xóa khuyến mãi \"{km.MaCode}\".";
             }
             return RedirectToAction(nameof(KhuyenMai));
@@ -409,11 +432,12 @@ namespace webHuyBeo.Controllers
         [HttpPost]
         public async Task<IActionResult> ToggleKhuyenMai(int id)
         {
-            var km = await _db.KhuyenMais.FindAsync(id);
+            var km = await _khuyenMaiRepo.GetFirstOrDefaultAsync(k => k.KhuyenMaiID == id);
             if (km != null)
             {
                 km.TrangThai = km.TrangThai == "HoatDong" ? "TamDung" : "HoatDong";
-                await _db.SaveChangesAsync();
+                _khuyenMaiRepo.Update(km);
+                await _khuyenMaiRepo.SaveAsync();
                 return Json(new { success = true, trangThai = km.TrangThai });
             }
             return Json(new { success = false });
@@ -427,7 +451,7 @@ namespace webHuyBeo.Controllers
         {
             ViewData["Title"] = "Quản lý Nhân viên";
             ViewData["ActiveMenu"] = "nhanvien";
-            var list = await _db.NguoiDungs.OrderBy(n => n.VaiTro).ThenBy(n => n.Hoten).ToListAsync();
+            var list = await _nguoiDungRepo.Query().OrderBy(n => n.VaiTro).ThenBy(n => n.Hoten).ToListAsync();
             return View(list);
         }
 
@@ -437,19 +461,21 @@ namespace webHuyBeo.Controllers
         {
             ModelState.Remove("DonHangs");
             ModelState.Remove("NhatKyDons");
-            // Check duplicate username
-            if (await _db.NguoiDungs.AnyAsync(n => n.TenDangNhap == model.TenDangNhap))
+            ModelState.Remove("TrangThai");
+
+            var allUsers = await _nguoiDungRepo.GetAllAsync();
+            if (allUsers.Any(n => n.TenDangNhap == model.TenDangNhap))
             {
                 TempData["Error"] = $"Tên đăng nhập \"{model.TenDangNhap}\" đã tồn tại!";
                 return RedirectToAction(nameof(NhanVien));
             }
+
             if (ModelState.IsValid)
             {
-                // Hash password with BCrypt-style simple hash (use proper BCrypt in prod)
                 model.MatKhau = BCryptHash(model.MatKhau);
                 model.TrangThai = "DangLamViec";
-                _db.NguoiDungs.Add(model);
-                await _db.SaveChangesAsync();
+                await _nguoiDungRepo.AddAsync(model);
+                await _nguoiDungRepo.SaveAsync();
                 TempData["Success"] = $"Đã thêm nhân viên \"{model.Hoten}\"!";
             }
             else
@@ -463,7 +489,7 @@ namespace webHuyBeo.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SuaNhanVien(int NguoiDungID, string Hoten, string VaiTro, string TrangThai, string? MatKhauMoi)
         {
-            var nv = await _db.NguoiDungs.FindAsync(NguoiDungID);
+            var nv = await _nguoiDungRepo.GetFirstOrDefaultAsync(n => n.NguoiDungID == NguoiDungID);
             if (nv != null)
             {
                 nv.Hoten = Hoten;
@@ -471,7 +497,9 @@ namespace webHuyBeo.Controllers
                 nv.TrangThai = TrangThai;
                 if (!string.IsNullOrEmpty(MatKhauMoi))
                     nv.MatKhau = BCryptHash(MatKhauMoi);
-                await _db.SaveChangesAsync();
+                
+                _nguoiDungRepo.Update(nv);
+                await _nguoiDungRepo.SaveAsync();
                 TempData["Success"] = $"Đã cập nhật nhân viên \"{nv.Hoten}\"!";
             }
             return RedirectToAction(nameof(NhanVien));
@@ -481,17 +509,17 @@ namespace webHuyBeo.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> XoaNhanVien(int id)
         {
-            var nv = await _db.NguoiDungs.FindAsync(id);
+            var nv = await _nguoiDungRepo.GetFirstOrDefaultAsync(n => n.NguoiDungID == id);
             if (nv != null)
             {
-                nv.TrangThai = "DaNghi"; // Soft delete - mark as resigned
-                await _db.SaveChangesAsync();
+                nv.TrangThai = "DaNghi"; // Soft delete
+                _nguoiDungRepo.Update(nv);
+                await _nguoiDungRepo.SaveAsync();
                 TempData["Success"] = $"Đã vô hiệu hóa tài khoản \"{nv.Hoten}\".";
             }
             return RedirectToAction(nameof(NhanVien));
         }
 
-        // Simple hash helper (replace with BCrypt.Net in production)
         private string BCryptHash(string password)
         {
             using var sha = System.Security.Cryptography.SHA256.Create();
@@ -508,24 +536,38 @@ namespace webHuyBeo.Controllers
             ViewData["Title"] = "Mã QR Quét Đặt món";
             ViewData["ActiveMenu"] = "qr";
 
-            // Lấy danh sách tất cả các IP IPv4 hợp lệ của máy
+            string primaryIp = "127.0.0.1";
+            try
+            {
+                using (var socket = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork, System.Net.Sockets.SocketType.Dgram, 0))
+                {
+                    socket.Connect("8.8.8.8", 65530);
+                    if (socket.LocalEndPoint is System.Net.IPEndPoint endPoint)
+                    {
+                        primaryIp = endPoint.Address.ToString();
+                    }
+                }
+            }
+            catch { }
+
             var ips = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
                 .Where(n => n.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up && 
                             n.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
                 .SelectMany(n => n.GetIPProperties().UnicastAddresses)
                 .Where(a => a.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
                 .Select(a => a.Address.ToString())
+                .Distinct()
                 .ToList();
 
-            // Sắp xếp ưu tiên IP Wi-Fi/Ethernet thông thường (thường là 192.168.1.x hoặc 192.168.0.x)
-            ips = ips.OrderByDescending(ip => ip.StartsWith("192.168.1.") || ip.StartsWith("192.168.0."))
-                     .ThenByDescending(ip => ip.StartsWith("192.168."))
-                     .ToList();
+            if (ips.Contains(primaryIp))
+            {
+                ips.Remove(primaryIp);
+            }
+            ips.Insert(0, primaryIp);
 
-            var defaultIp = ips.FirstOrDefault() ?? "127.0.0.1";
+            var defaultIp = primaryIp;
             var host = Request.Host.Value;
 
-            // Nếu đang truy cập bằng localhost/127.0.0.1 trên máy, thay thế bằng IP LAN để quét QR
             if (Request.Host.Host == "localhost" || Request.Host.Host == "127.0.0.1")
             {
                 var port = Request.Host.Port;
@@ -551,10 +593,7 @@ namespace webHuyBeo.Controllers
             ViewData["ActiveMenu"] = "donhang";
 
             int pageSize = 20;
-            var query = _db.DonHangs
-                .Include(d => d.ChiTietDons).ThenInclude(c => c.MonAn)
-                .Include(d => d.NguoiDung)
-                .AsQueryable();
+            var query = _donHangRepo.Query(includeProperties: "ChiTietDons.MonAn,NguoiDung");
 
             if (!string.IsNullOrEmpty(trangThai))
                 query = query.Where(d => d.TrangThai == trangThai);
@@ -580,21 +619,23 @@ namespace webHuyBeo.Controllers
         [HttpPost]
         public async Task<IActionResult> HuyDon(int id)
         {
-            var don = await _db.DonHangs.FindAsync(id);
+            var don = await _donHangRepo.GetFirstOrDefaultAsync(d => d.DonHangID == id);
             if (don != null && don.TrangThai != "DaHoanThanh")
             {
                 don.TrangThai = "Huy";
-                _db.NhatKyDons.Add(new NhatKyDon
+                _donHangRepo.Update(don);
+
+                await _nhatKyRepo.AddAsync(new NhatKyDon
                 {
                     DonHangID = id,
                     HanhDong = "HuyDon",
                     NgayTao = DateTime.Now
                 });
-                await _db.SaveChangesAsync();
+
+                await _donHangRepo.SaveAsync();
                 TempData["Success"] = $"Đã hủy đơn #{don.SoThuTu}.";
             }
             return RedirectToAction(nameof(DonHang));
         }
     }
 }
-

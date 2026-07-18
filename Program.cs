@@ -6,9 +6,17 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+builder.Services.AddSignalR(); // Thêm SignalR
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+// Đăng ký Dependency Injection cho Repositories và Services
+builder.Services.AddScoped(typeof(webHuyBeo.Repositories.IRepository<>), typeof(webHuyBeo.Repositories.Repository<>));
+builder.Services.AddScoped<webHuyBeo.Services.IAuthService, webHuyBeo.Services.AuthService>();
+builder.Services.AddScoped<webHuyBeo.Services.IMenuService, webHuyBeo.Services.MenuService>();
+builder.Services.AddScoped<webHuyBeo.Services.IPaymentService, webHuyBeo.Services.PaymentService>();
+builder.Services.AddScoped<webHuyBeo.Services.IOrderService, webHuyBeo.Services.OrderService>();
 
 // Cookie Authentication
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -68,6 +76,8 @@ app.UseAuthorization();
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
+
+app.MapHub<webHuyBeo.Hubs.OrderHub>("/orderHub");
 
 app.Run();
 

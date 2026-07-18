@@ -105,14 +105,43 @@
     </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.12/signalr.min.js"></script>
 <script>
 async function checkStatus() {
     const btn = document.getElementById('refreshBtn');
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Đang kiểm tra...';
     btn.disabled = true;
-    // Reload page to check latest status
     setTimeout(() => window.location.reload(), 500);
 }
+
+// ==========================================
+// TÍCH HỢP SIGNALR REAL-TIME (KHÁCH HÀNG)
+// ==========================================
+const donHangId = @Model.DonHangID;
+const connection = new signalR.HubConnectionBuilder()
+    .withUrl("/orderHub")
+    .configureLogging(signalR.LogLevel.Information)
+    .build();
+
+connection.on("ReceiveOrderStatusChanged", function (id, trangThaiMoi) {
+    if (id === donHangId) {
+        // Đơn hàng của khách hàng này vừa thay đổi trạng thái
+        // Tải lại trang để cập nhật UI
+        window.location.reload();
+    }
+});
+
+async function startSignalR() {
+    try {
+        await connection.start();
+        console.log("SignalR Connected in Order Status page.");
+    } catch (err) {
+        console.log(err);
+        setTimeout(startSignalR, 5000);
+    }
+}
+
+startSignalR();
 </script>
 </body>
 </html>

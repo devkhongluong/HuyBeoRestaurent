@@ -1,19 +1,28 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
 using webHuyBeo.Models;
+using webHuyBeo.Repositories;
+using webHuyBeo.Hubs;
 
 namespace webHuyBeo.Controllers
 {
     [Authorize(Roles = "Admin,QuanLy,ThuNgan")]
     public class PosController : Controller
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IRepository<DonHang> _donHangRepo;
+        private readonly IRepository<NhatKyDon> _nhatKyRepo;
+        private readonly IHubContext<OrderHub> _hubContext;
 
-        public PosController(ApplicationDbContext db)
+        public PosController(
+            IRepository<DonHang> donHangRepo, 
+            IRepository<NhatKyDon> nhatKyRepo,
+            IHubContext<OrderHub> hubContext)
         {
-            _db = db;
+            _donHangRepo = donHangRepo;
+            _nhatKyRepo = nhatKyRepo;
+            _hubContext = hubContext;
         }
 
         private int GetCurrentUserId()
@@ -27,11 +36,9 @@ namespace webHuyBeo.Controllers
             ViewData["Title"] = "POS Thu ngân";
             ViewData["ActiveMenu"] = "pos";
 
-            var query = _db.DonHangs
-                .Include(d => d.ChiTietDons).ThenInclude(c => c.MonAn)
-                .Include(d => d.PhienOrder)
-                .Where(d => d.TrangThai != "Huy")
-                .AsQueryable();
+            var query = _donHangRepo.Query(
+                d => d.TrangThai != "Huy", 
+                includeProperties: "ChiTietDons.MonAn,PhienOrder");
 
             // Default: show pending orders
             if (!string.IsNullOrEmpty(trangThai))
@@ -44,24 +51,26 @@ namespace webHuyBeo.Controllers
                 query = query.Where(d => d.TrangThai != "DaHoanThanh");
             }
 
-            var donHangs = await query
+            var donHangs = query
                 .OrderByDescending(d => d.TrangThai == "ChoXacNhan")
                 .ThenByDescending(d => d.NgayTao)
-                .ToListAsync();
+                .ToList();
+
+            var allActiveDonHangs = await _donHangRepo.GetAllAsync();
 
             // Count by status for tabs
-            ViewBag.CountCho = await _db.DonHangs.CountAsync(d => d.TrangThai == "ChoXacNhan");
-            ViewBag.CountXacNhan = await _db.DonHangs.CountAsync(d => d.TrangThai == "DaXacNhan");
-            ViewBag.CountDangLam = await _db.DonHangs.CountAsync(d => d.TrangThai == "DangCheBien");
-            ViewBag.CountSanSang = await _db.DonHangs.CountAsync(d => d.TrangThai == "SanSangPhucVu");
-            ViewBag.CountHoanThanh = await _db.DonHangs.CountAsync(d =>
+            ViewBag.CountCho = allActiveDonHangs.Count(d => d.TrangThai == "ChoXacNhan");
+            ViewBag.CountXacNhan = allActiveDonHangs.Count(d => d.TrangThai == "DaXacNhan");
+            ViewBag.CountDangLam = allActiveDonHangs.Count(d => d.TrangThai == "DangCheBien");
+            ViewBag.CountSanSang = allActiveDonHangs.Count(d => d.TrangThai == "SanSangPhucVu");
+            ViewBag.CountHoanThanh = allActiveDonHangs.Count(d =>
                 d.TrangThai == "DaHoanThanh" && d.NgayTao.Date == DateTime.Today);
             ViewBag.TrangThai = trangThai;
 
             // Revenue today
-            ViewBag.DoanhThuHomNay = await _db.DonHangs
+            ViewBag.DoanhThuHomNay = allActiveDonHangs
                 .Where(d => d.NgayTao.Date == DateTime.Today && d.TrangThaiTT == "DaThanhToan")
-                .SumAsync(d => (decimal?)d.ThanhTien) ?? 0;
+                .Sum(d => (decimal?)d.ThanhTien) ?? 0;
 
             return View(donHangs);
         }
@@ -69,13 +78,9 @@ namespace webHuyBeo.Controllers
         // GET: /Pos/ChiTiet/5
         public async Task<IActionResult> ChiTiet(int id)
         {
-            var don = await _db.DonHangs
-                .Include(d => d.ChiTietDons).ThenInclude(c => c.MonAn)
-                .Include(d => d.ChiTietDons).ThenInclude(c => c.ChiTietToppings).ThenInclude(ct => ct.Topping)
-                .Include(d => d.DonHangKhuyenMais).ThenInclude(dk => dk.KhuyenMai)
-                .Include(d => d.NhatKyDons).ThenInclude(n => n.NguoiDung)
-                .Include(d => d.PhienOrder)
-                .FirstOrDefaultAsync(d => d.DonHangID == id);
+            var don = await _donHangRepo.GetFirstOrDefaultAsync(
+                d => d.DonHangID == id,
+                includeProperties: "ChiTietDons.MonAn,ChiTietDons.ChiTietToppings.Topping,DonHangKhuyenMais.KhuyenMai,NhatKyDons.NguoiDung,PhienOrder");
 
             if (don == null) return NotFound();
 
@@ -124,20 +129,26 @@ namespace webHuyBeo.Controllers
         [HttpPost]
         public async Task<IActionResult> XacNhan(int id)
         {
-            var don = await _db.DonHangs.FindAsync(id);
+            var don = await _donHangRepo.GetFirstOrDefaultAsync(d => d.DonHangID == id);
             if (don == null) return Json(new { success = false, message = "Đơn không tồn tại." });
             if (don.TrangThai != "ChoXacNhan")
                 return Json(new { success = false, message = "Đơn không ở trạng thái chờ xác nhận." });
 
             don.TrangThai = "DaXacNhan";
-            _db.NhatKyDons.Add(new NhatKyDon
+            _donHangRepo.Update(don);
+
+            await _nhatKyRepo.AddAsync(new NhatKyDon
             {
                 DonHangID = id,
                 NguoiDungID = GetCurrentUserId(),
                 HanhDong = "XacNhan",
                 NgayTao = DateTime.Now
             });
-            await _db.SaveChangesAsync();
+            await _nhatKyRepo.SaveAsync();
+
+            // Bắn tín hiệu SignalR cho Bếp biết có đơn vừa được xác nhận để nấu
+            await _hubContext.Clients.All.SendAsync("ReceiveNewOrder");
+            await _hubContext.Clients.All.SendAsync("ReceiveOrderStatusChanged", id, "DaXacNhan");
 
             return Json(new { success = true, message = $"Đã xác nhận đơn #{don.SoThuTu}." });
         }
@@ -146,7 +157,7 @@ namespace webHuyBeo.Controllers
         [HttpPost]
         public async Task<IActionResult> ChuyenTrangThai(int id, string trangThaiMoi)
         {
-            var don = await _db.DonHangs.FindAsync(id);
+            var don = await _donHangRepo.GetFirstOrDefaultAsync(d => d.DonHangID == id);
             if (don == null) return Json(new { success = false, message = "Đơn không tồn tại." });
 
             // Valid state transitions
@@ -167,14 +178,18 @@ namespace webHuyBeo.Controllers
             if (trangThaiMoi == "DaHoanThanh")
                 don.NgayHoanThanh = DateTime.Now;
 
-            _db.NhatKyDons.Add(new NhatKyDon
+            _donHangRepo.Update(don);
+
+            await _nhatKyRepo.AddAsync(new NhatKyDon
             {
                 DonHangID = id,
                 NguoiDungID = GetCurrentUserId(),
                 HanhDong = trangThaiMoi,
                 NgayTao = DateTime.Now
             });
-            await _db.SaveChangesAsync();
+            await _nhatKyRepo.SaveAsync();
+
+            await _hubContext.Clients.All.SendAsync("ReceiveOrderStatusChanged", id, trangThaiMoi);
 
             return Json(new { success = true, message = $"Đã cập nhật đơn #{don.SoThuTu}." });
         }
@@ -183,20 +198,21 @@ namespace webHuyBeo.Controllers
         [HttpPost]
         public async Task<IActionResult> ThuTien(int id, string phuongThuc)
         {
-            var don = await _db.DonHangs.FindAsync(id);
+            var don = await _donHangRepo.GetFirstOrDefaultAsync(d => d.DonHangID == id);
             if (don == null) return Json(new { success = false, message = "Đơn không tồn tại." });
 
             don.TrangThaiTT = "DaThanhToan";
             don.PhuongThucTT = phuongThuc;
+            _donHangRepo.Update(don);
 
-            _db.NhatKyDons.Add(new NhatKyDon
+            await _nhatKyRepo.AddAsync(new NhatKyDon
             {
                 DonHangID = id,
                 NguoiDungID = GetCurrentUserId(),
                 HanhDong = $"ThanhToan_{phuongThuc}",
                 NgayTao = DateTime.Now
             });
-            await _db.SaveChangesAsync();
+            await _nhatKyRepo.SaveAsync();
 
             return Json(new { success = true, message = $"Đã thu tiền đơn #{don.SoThuTu}." });
         }
@@ -205,21 +221,24 @@ namespace webHuyBeo.Controllers
         [HttpPost]
         public async Task<IActionResult> HuyDon(int id, string? lyDo)
         {
-            var don = await _db.DonHangs.FindAsync(id);
+            var don = await _donHangRepo.GetFirstOrDefaultAsync(d => d.DonHangID == id);
             if (don == null) return Json(new { success = false, message = "Đơn không tồn tại." });
             if (don.TrangThai == "DaHoanThanh")
                 return Json(new { success = false, message = "Không thể hủy đơn đã hoàn thành." });
 
             don.TrangThai = "Huy";
+            _donHangRepo.Update(don);
 
-            _db.NhatKyDons.Add(new NhatKyDon
+            await _nhatKyRepo.AddAsync(new NhatKyDon
             {
                 DonHangID = id,
                 NguoiDungID = GetCurrentUserId(),
                 HanhDong = $"HuyDon: {lyDo ?? "Không có lý do"}",
                 NgayTao = DateTime.Now
             });
-            await _db.SaveChangesAsync();
+            await _nhatKyRepo.SaveAsync();
+
+            await _hubContext.Clients.All.SendAsync("ReceiveOrderStatusChanged", id, "Huy");
 
             return Json(new { success = true, message = $"Đã hủy đơn #{don.SoThuTu}." });
         }
@@ -227,10 +246,9 @@ namespace webHuyBeo.Controllers
         // GET: /Pos/InBill/5
         public async Task<IActionResult> InBill(int id)
         {
-            var don = await _db.DonHangs
-                .Include(d => d.ChiTietDons).ThenInclude(c => c.MonAn)
-                .Include(d => d.DonHangKhuyenMais).ThenInclude(dk => dk.KhuyenMai)
-                .FirstOrDefaultAsync(d => d.DonHangID == id);
+            var don = await _donHangRepo.GetFirstOrDefaultAsync(
+                d => d.DonHangID == id,
+                includeProperties: "ChiTietDons.MonAn,DonHangKhuyenMais.KhuyenMai");
 
             if (don == null) return NotFound();
 

@@ -400,7 +400,46 @@ else
         else alert(data.message);
     }
 
-    // Auto-refresh every 30 seconds
+    // Auto-refresh every 30 seconds (fallback)
     setInterval(() => location.reload(), 30000);
+
+    // ==========================================
+    // TÍCH HỢP SIGNALR REAL-TIME
+    // ==========================================
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/orderHub")
+        .configureLogging(signalR.LogLevel.Information)
+        .build();
+
+    connection.on("ReceiveNewOrder", function () {
+        // Có đơn mới từ khách
+        if (confirm("🔔 CÓ ĐƠN ĐẶT HÀNG MỚI! Tải lại trang để xem ngay?")) {
+            location.reload();
+        }
+    });
+
+    connection.on("ReceiveOrderStatusChanged", function (donHangId, trangThaiMoi) {
+        // Có thay đổi trạng thái từ bếp (Bếp báo nấu xong, hoặc bắt đầu làm)
+        if (trangThaiMoi === "SanSangPhucVu") {
+            // Bếp báo xong món
+            alert(`✅ Đơn #${donHangId} đã được Bếp chế biến xong!`);
+            location.reload();
+        } else {
+            // Reload ngầm
+            setTimeout(() => location.reload(), 1500);
+        }
+    });
+
+    async function startSignalR() {
+        try {
+            await connection.start();
+            console.log("SignalR Connected in POS.");
+        } catch (err) {
+            console.log(err);
+            setTimeout(startSignalR, 5000);
+        }
+    }
+
+    startSignalR();
 </script>
 }

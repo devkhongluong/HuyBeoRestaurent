@@ -261,7 +261,46 @@ else
         else alert(data.message);
     }
 
-    // Auto-refresh every 20 seconds
+    // Auto-refresh every 20 seconds (fallback)
     setInterval(() => location.reload(), 20000);
+
+    // ==========================================
+    // TÍCH HỢP SIGNALR REAL-TIME
+    // ==========================================
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/orderHub")
+        .configureLogging(signalR.LogLevel.Information)
+        .build();
+
+    connection.on("ReceiveNewOrder", function () {
+        // Có đơn mới từ khách hoặc thu ngân xác nhận
+        // Hiển thị thông báo và tải lại trang
+        if (confirm("🔔 CÓ ĐƠN HÀNG MỚI! Tải lại trang ngay?")) {
+            location.reload();
+        }
+    });
+
+    connection.on("ReceiveOrderStatusChanged", function (donHangId, trangThaiMoi) {
+        // Nếu có đơn vừa bị Hủy hoặc hoàn thành từ Pos
+        if (trangThaiMoi === "Huy" || trangThaiMoi === "DaHoanThanh") {
+            const card = document.getElementById(`kds-${donHangId}`);
+            if (card) {
+                card.style.opacity = '0.5';
+                setTimeout(() => location.reload(), 2000); // Reload sau 2s
+            }
+        }
+    });
+
+    async function startSignalR() {
+        try {
+            await connection.start();
+            console.log("SignalR Connected in Kitchen (Bếp).");
+        } catch (err) {
+            console.log(err);
+            setTimeout(startSignalR, 5000);
+        }
+    }
+
+    startSignalR();
 </script>
 }

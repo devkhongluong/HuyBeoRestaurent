@@ -2,19 +2,18 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
-using webHuyBeo.Models;
+using webHuyBeo.Services;
 
 namespace webHuyBeo.Controllers
 {
     public class AuthController : Controller
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IAuthService _authService;
 
-        public AuthController(ApplicationDbContext db)
+        public AuthController(IAuthService authService)
         {
-            _db = db;
+            _authService = authService;
         }
 
         // GET: /Auth/Login
@@ -22,7 +21,12 @@ namespace webHuyBeo.Controllers
         public IActionResult Login(string? returnUrl)
         {
             if (User.Identity?.IsAuthenticated == true)
+            {
+                var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+                if (role == "Bep") return RedirectToAction("Index", "Bep");
+                if (role == "ThuNgan") return RedirectToAction("Index", "Pos");
                 return RedirectToAction("Index", "Admin");
+            }
 
             ViewBag.ReturnUrl = returnUrl;
             return View();
@@ -41,41 +45,15 @@ namespace webHuyBeo.Controllers
                 return View();
             }
 
-            var user = await _db.NguoiDungs.FirstOrDefaultAsync(u => u.TenDangNhap == tenDangNhap);
+            var user = await _authService.AuthenticateAsync(tenDangNhap, matKhau);
             if (user == null)
             {
-                ViewBag.Error = "Tên đăng nhập hoặc mật khẩu không đúng.";
+                ViewBag.Error = "Tên đăng nhập, mật khẩu không đúng hoặc tài khoản đã bị vô hiệu hóa.";
                 ViewBag.ReturnUrl = returnUrl;
                 return View();
             }
 
-            // Verify password
-            var hashedInput = HashPassword(matKhau);
-            if (user.MatKhau != hashedInput)
-            {
-                ViewBag.Error = "Tên đăng nhập hoặc mật khẩu không đúng.";
-                ViewBag.ReturnUrl = returnUrl;
-                return View();
-            }
-
-            if (user.TrangThai == "DaNghi")
-            {
-                ViewBag.Error = "Tài khoản đã bị vô hiệu hóa. Liên hệ quản lý.";
-                ViewBag.ReturnUrl = returnUrl;
-                return View();
-            }
-
-            // Create claims
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.NameIdentifier, user.NguoiDungID.ToString()),
-                new Claim(ClaimTypes.Name, user.Hoten),
-                new Claim("TenDangNhap", user.TenDangNhap),
-                new Claim(ClaimTypes.Role, user.VaiTro)
-            };
-
-            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-            var principal = new ClaimsPrincipal(identity);
+            var principal = _authService.CreateClaimsPrincipal(user);
 
             await HttpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme,
@@ -145,19 +123,15 @@ namespace webHuyBeo.Controllers
                 return View();
             }
 
-            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
-            var user = await _db.NguoiDungs.FindAsync(userId);
-            if (user == null) return NotFound();
+            var userIdString = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (userIdString == null || !int.TryParse(userIdString, out int userId)) return NotFound();
 
-            var hashedOld = HashPassword(matKhauCu);
-            if (user.MatKhau != hashedOld)
+            var success = await _authService.ChangePasswordAsync(userId, matKhauCu, matKhauMoi);
+            if (!success)
             {
                 ViewBag.Error = "Mật khẩu hiện tại không đúng.";
                 return View();
             }
-
-            user.MatKhau = HashPassword(matKhauMoi);
-            await _db.SaveChangesAsync();
 
             ViewBag.Success = "Đổi mật khẩu thành công!";
             return View();
@@ -168,14 +142,6 @@ namespace webHuyBeo.Controllers
         public IActionResult AccessDenied()
         {
             return View();
-        }
-
-        // Must match the hash in AdminController
-        private string HashPassword(string password)
-        {
-            using var sha = System.Security.Cryptography.SHA256.Create();
-            var bytes = System.Text.Encoding.UTF8.GetBytes(password + "HuyBeoSalt2026");
-            return Convert.ToBase64String(sha.ComputeHash(bytes));
         }
     }
 }

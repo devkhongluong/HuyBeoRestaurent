@@ -1,19 +1,31 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
 using webHuyBeo.Models;
+using webHuyBeo.Repositories;
+using webHuyBeo.Hubs;
 
 namespace webHuyBeo.Controllers
 {
     [Authorize(Roles = "Admin,QuanLy,Bep")]
     public class BepController : Controller
     {
-        private readonly ApplicationDbContext _db;
+        private readonly IRepository<DonHang> _donHangRepo;
+        private readonly IRepository<ChiTietDon> _chiTietRepo;
+        private readonly IRepository<NhatKyDon> _nhatKyRepo;
+        private readonly IHubContext<OrderHub> _hubContext;
 
-        public BepController(ApplicationDbContext db)
+        public BepController(
+            IRepository<DonHang> donHangRepo,
+            IRepository<ChiTietDon> chiTietRepo,
+            IRepository<NhatKyDon> nhatKyRepo,
+            IHubContext<OrderHub> hubContext)
         {
-            _db = db;
+            _donHangRepo = donHangRepo;
+            _chiTietRepo = chiTietRepo;
+            _nhatKyRepo = nhatKyRepo;
+            _hubContext = hubContext;
         }
 
         private int GetCurrentUserId()
@@ -27,14 +39,11 @@ namespace webHuyBeo.Controllers
             ViewData["Title"] = "Bếp (KDS)";
             ViewData["ActiveMenu"] = "bep";
 
-            // Get orders that are confirmed or being prepared
-            var donHangs = await _db.DonHangs
-                .Include(d => d.ChiTietDons).ThenInclude(c => c.MonAn)
-                .Include(d => d.ChiTietDons).ThenInclude(c => c.ChiTietToppings).ThenInclude(ct => ct.Topping)
-                .Where(d => d.TrangThai == "DaXacNhan" || d.TrangThai == "DangCheBien")
-                .OrderBy(d => d.NgayTao)
-                .ToListAsync();
+            var donHangs = await _donHangRepo.GetAllAsync(
+                d => d.TrangThai == "DaXacNhan" || d.TrangThai == "DangCheBien",
+                includeProperties: "ChiTietDons.MonAn,ChiTietDons.ChiTietToppings.Topping");
 
+            donHangs = donHangs.OrderBy(d => d.NgayTao).ToList();
             return View(donHangs);
         }
 
@@ -42,9 +51,9 @@ namespace webHuyBeo.Controllers
         [HttpPost]
         public async Task<IActionResult> BatDauLam(int id)
         {
-            var don = await _db.DonHangs
-                .Include(d => d.ChiTietDons)
-                .FirstOrDefaultAsync(d => d.DonHangID == id);
+            var don = await _donHangRepo.GetFirstOrDefaultAsync(
+                d => d.DonHangID == id,
+                includeProperties: "ChiTietDons");
 
             if (don == null)
                 return Json(new { success = false, message = "Đơn không tồn tại." });
@@ -54,14 +63,16 @@ namespace webHuyBeo.Controllers
 
             don.TrangThai = "DangCheBien";
 
-            // Mark all items as "DangLam"
             foreach (var ct in don.ChiTietDons)
             {
                 ct.TrangThaiBep = "DangLam";
                 ct.ThoiGianBatDauCB = DateTime.Now;
+                _chiTietRepo.Update(ct);
             }
 
-            _db.NhatKyDons.Add(new NhatKyDon
+            _donHangRepo.Update(don);
+            
+            await _nhatKyRepo.AddAsync(new NhatKyDon
             {
                 DonHangID = id,
                 NguoiDungID = GetCurrentUserId(),
@@ -69,7 +80,11 @@ namespace webHuyBeo.Controllers
                 NgayTao = DateTime.Now
             });
 
-            await _db.SaveChangesAsync();
+            await _donHangRepo.SaveAsync(); // Save all changes
+
+            // Bắn tín hiệu SignalR cập nhật trạng thái đơn (để Khách/Thu ngân có thể biết)
+            await _hubContext.Clients.All.SendAsync("ReceiveOrderStatusChanged", id, "DangCheBien");
+
             return Json(new { success = true });
         }
 
@@ -77,21 +92,20 @@ namespace webHuyBeo.Controllers
         [HttpPost]
         public async Task<IActionResult> XongMon(int chiTietId)
         {
-            var ct = await _db.ChiTietDons
-                .Include(c => c.DonHang)
-                .FirstOrDefaultAsync(c => c.ChiTietID == chiTietId);
+            var ct = await _chiTietRepo.GetFirstOrDefaultAsync(
+                c => c.ChiTietID == chiTietId,
+                includeProperties: "DonHang");
 
             if (ct == null)
                 return Json(new { success = false, message = "Món không tồn tại." });
 
             ct.TrangThaiBep = "HoanThanh";
             ct.ThoiGianHoanThanh = DateTime.Now;
-            await _db.SaveChangesAsync();
+            _chiTietRepo.Update(ct);
+            await _chiTietRepo.SaveAsync();
 
-            // Check if all items in the order are done
-            var allDone = await _db.ChiTietDons
-                .Where(c => c.DonHangID == ct.DonHangID)
-                .AllAsync(c => c.TrangThaiBep == "HoanThanh");
+            var allItems = await _chiTietRepo.GetAllAsync(c => c.DonHangID == ct.DonHangID);
+            var allDone = allItems.All(c => c.TrangThaiBep == "HoanThanh");
 
             return Json(new { success = true, allDone });
         }
@@ -100,13 +114,14 @@ namespace webHuyBeo.Controllers
         [HttpPost]
         public async Task<IActionResult> HoanLai(int chiTietId)
         {
-            var ct = await _db.ChiTietDons.FindAsync(chiTietId);
+            var ct = await _chiTietRepo.GetFirstOrDefaultAsync(c => c.ChiTietID == chiTietId);
             if (ct == null)
                 return Json(new { success = false });
 
             ct.TrangThaiBep = "DangLam";
             ct.ThoiGianHoanThanh = null;
-            await _db.SaveChangesAsync();
+            _chiTietRepo.Update(ct);
+            await _chiTietRepo.SaveAsync();
 
             return Json(new { success = true });
         }
@@ -115,23 +130,24 @@ namespace webHuyBeo.Controllers
         [HttpPost]
         public async Task<IActionResult> XongDon(int id)
         {
-            var don = await _db.DonHangs
-                .Include(d => d.ChiTietDons)
-                .FirstOrDefaultAsync(d => d.DonHangID == id);
+            var don = await _donHangRepo.GetFirstOrDefaultAsync(
+                d => d.DonHangID == id,
+                includeProperties: "ChiTietDons");
 
             if (don == null)
                 return Json(new { success = false, message = "Đơn không tồn tại." });
 
-            // Mark all remaining items as done
             foreach (var ct in don.ChiTietDons.Where(c => c.TrangThaiBep != "HoanThanh"))
             {
                 ct.TrangThaiBep = "HoanThanh";
                 ct.ThoiGianHoanThanh = DateTime.Now;
+                _chiTietRepo.Update(ct);
             }
 
             don.TrangThai = "SanSangPhucVu";
+            _donHangRepo.Update(don);
 
-            _db.NhatKyDons.Add(new NhatKyDon
+            await _nhatKyRepo.AddAsync(new NhatKyDon
             {
                 DonHangID = id,
                 NguoiDungID = GetCurrentUserId(),
@@ -139,7 +155,11 @@ namespace webHuyBeo.Controllers
                 NgayTao = DateTime.Now
             });
 
-            await _db.SaveChangesAsync();
+            await _donHangRepo.SaveAsync();
+            
+            // Bắn tín hiệu SignalR cho Thu ngân biết Bếp đã nấu xong đơn này
+            await _hubContext.Clients.All.SendAsync("ReceiveOrderStatusChanged", id, "SanSangPhucVu");
+
             return Json(new { success = true, message = $"Đơn #{don.SoThuTu} sẵn sàng phục vụ!" });
         }
     }
